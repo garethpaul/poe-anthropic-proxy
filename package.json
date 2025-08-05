@@ -1,0 +1,31 @@
+{
+  "name": "poe-anthropic-bridge",
+  "version": "1.0.0",
+  "description": "Bridge between Anthropic Messages API and Poe API",
+  "main": "poe-proxy.js",
+  "type": "module",
+  "scripts": {
+    "start": "node poe-proxy.js",
+    "dev": "node --watch poe-proxy.js",
+    "test": "curl -X POST http://localhost:3000/v1/messages -H 'Content-Type: application/json' -d '{\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"max_tokens\":100}'"
+  },
+  "dependencies": {
+    "fastify": "^4.26.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "keywords": [
+    "anthropic",
+    "poe",
+    "api",
+    "proxy",
+    "bridge"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
