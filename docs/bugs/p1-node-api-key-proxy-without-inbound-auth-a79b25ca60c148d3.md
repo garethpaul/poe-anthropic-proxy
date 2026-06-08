@@ -8,7 +8,7 @@ P1 - security/authentication
 
 - `poe-proxy.js:22`: `apiKey: env.POE_API_KEY,`
 - `poe-proxy.js:281`: `fastify.post("/v1/messages", async (request, reply) => {`
-- `poe-proxy.js:288`: `Authorization: `Bearer ${apiKey}`,`
+- `poe-proxy.js:288`: `` Authorization: `Bearer ${apiKey}`, ``
 - `poe-proxy.js:517`: `await fastify.listen({ port: config.port, host: "0.0.0.0" });`
 
 ## Problem
