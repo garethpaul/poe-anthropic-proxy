@@ -16,7 +16,7 @@ The current focus is:
 Priority:
 
 - Preserve the `/v1/messages` compatibility surface
-- Keep Poe API credentials in environment configuration
+- Keep Poe API credentials in environment configuration behind inbound proxy auth
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 
@@ -32,6 +32,7 @@ Contribution rules:
 - One PR = one focused mapping, endpoint, test, or documentation change.
 - Add unit tests for every compatibility promise.
 - Do not log prompts, API keys, or tool payloads by default.
+- Keep `POE_PROXY_API_KEY` required when forwarding with a server-side Poe key.
 - Keep live-network behavior separate from deterministic local tests.
 
 ## Security And Responsible Use

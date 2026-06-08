@@ -7,6 +7,7 @@ import {
   buildPoePayload,
   createServer,
   isDebugEnabled,
+  loadConfig,
   mapModelName,
   mapStopReason,
   removeUriFormat,
@@ -158,6 +159,17 @@ test("model, stop reason, and debug mappings are deterministic", () => {
   assert.equal(isDebugEnabled("1"), true);
 });
 
+test("loadConfig binds localhost by default and reads proxy auth", () => {
+  const config = loadConfig({
+    POE_API_KEY: "poe-key",
+    POE_PROXY_API_KEY: "proxy-key",
+  });
+
+  assert.equal(config.host, "127.0.0.1");
+  assert.equal(config.proxyApiKey, "proxy-key");
+  assert.equal(loadConfig({ HOST: "0.0.0.0" }).host, "0.0.0.0");
+});
+
 test("buildAnthropicResponse maps non-streaming Poe text responses", () => {
   const response = buildAnthropicResponse(
     {
@@ -246,6 +258,7 @@ test("createServer handles non-streaming requests with injected fetch", async ()
   let capturedRequest;
   const server = createServer({
     apiKey: "test-key",
+    proxyApiKey: "proxy-key",
     baseUrl: "https://example.test",
     defaultModel: "claude-sonnet-4-20250514",
     logger: false,
@@ -279,6 +292,9 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     const response = await server.inject({
       method: "POST",
       url: "/v1/messages",
+      headers: {
+        authorization: "Bearer proxy-key",
+      },
       payload: {
         messages: [{ role: "user", content: "Hello" }],
         max_tokens: 25,
@@ -298,6 +314,45 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     assert.deepEqual(response.json().content, [
       { text: "Hello from Poe", type: "text" },
     ]);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer rejects unauthenticated requests before upstream fetch", async () => {
+  let fetchCalled = false;
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error("fetch should not be called");
+    },
+  });
+
+  try {
+    const missing = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+      },
+    });
+    const invalid = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: {
+        authorization: "Bearer wrong-key",
+      },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+      },
+    });
+
+    assert.equal(missing.statusCode, 401);
+    assert.equal(invalid.statusCode, 403);
+    assert.equal(fetchCalled, false);
   } finally {
     await server.close();
   }

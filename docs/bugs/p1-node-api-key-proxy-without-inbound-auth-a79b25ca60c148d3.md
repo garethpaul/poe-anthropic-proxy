@@ -19,6 +19,13 @@ The service exposes an HTTP route that accepts caller-supplied request bodies, f
 
 Require an inbound proxy token or session before building the upstream request, reject missing or invalid credentials with 401 or 403, bind only to localhost by default for local-only use, and add route tests that prove unauthenticated `/v1/messages` requests do not reach the upstream fetch implementation.
 
+## Resolution
+
+The proxy now requires `POE_PROXY_API_KEY` for inbound `/v1/messages` requests,
+accepts it through `Authorization: Bearer ...`, rejects missing credentials
+with 401 and invalid credentials with 403 before upstream fetch, and binds to
+`127.0.0.1` by default unless `HOST` is explicitly configured.
+
 ## Review metadata
 
 - Repository: `garethpaul/poe-anthropic-proxy`

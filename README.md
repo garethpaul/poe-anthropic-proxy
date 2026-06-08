@@ -31,14 +31,16 @@ Additional scan context:
 ### Prerequisites
 
 - Git
-- Node.js and npm
+- Node.js 20 or newer and npm
 
 ### Setup
 
 ```bash
 git clone https://github.com/garethpaul/poe-anthropic-proxy.git
 cd poe-anthropic-proxy
-npm install
+npm ci
+export POE_API_KEY=...
+export POE_PROXY_API_KEY=...
 ```
 
 The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
@@ -47,6 +49,9 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 - Run `npm start` for the default development command.
 - Run `npm run dev` for the development server when that script is appropriate.
+- The server binds to `127.0.0.1` by default. Set `HOST` explicitly only when
+  you have a separate access-control boundary.
+- Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
 
 Detected npm scripts:
 
@@ -58,13 +63,25 @@ Detected npm scripts:
 
 ## Testing and Verification
 
-- `npm test`
+Run the local verification gate before changing the proxy:
+
+```bash
+npm run verify
+```
+
+`npm run verify` runs deterministic Node tests and `npm audit
+--audit-level=moderate`. The tests do not require a live Poe API key or network
+access.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
 ## Configuration and Secrets
 
 - Detected references to OpenAI. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
+- `POE_API_KEY` is the upstream Poe credential and must stay server-side.
+- `POE_PROXY_API_KEY` is the inbound caller token required by `/v1/messages`.
+- `HOST` defaults to `127.0.0.1`; avoid `0.0.0.0` unless the proxy is behind
+  another authenticated boundary.
 
 ## Security and Privacy Notes
 
@@ -78,6 +95,9 @@ When the required SDK or runtime is unavailable, use static checks and source re
 
 - See `SECURITY.md` for vulnerability reporting and safe research guidance.
 - See `VISION.md` for project direction and contribution guardrails.
+- See `CHANGES.md` for maintenance history.
+- See `docs/plans/2026-06-08-inbound-proxy-auth.md` for the inbound proxy
+  authorization baseline.
 
 ## Contributing
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import Fastify from "fastify";
+import { timingSafeEqual } from "node:crypto";
 import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
 
 const DEFAULT_BASE_URL = "https://api.poe.com";
 const DEFAULT_MODEL = "GPT-4.1";
+const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;
 
 export function isDebugEnabled(value) {
@@ -20,7 +22,9 @@ export function loadConfig(env = process.env) {
   return {
     baseUrl: env.POE_BASE_URL || DEFAULT_BASE_URL,
     apiKey: env.POE_API_KEY,
+    proxyApiKey: env.POE_PROXY_API_KEY,
     defaultModel: env.POE_MODEL || DEFAULT_MODEL,
+    host: env.HOST || DEFAULT_HOST,
     port: env.PORT || DEFAULT_PORT,
     debug: isDebugEnabled(env.DEBUG),
   };
@@ -35,6 +39,57 @@ function printMissingApiKeyHelp() {
   console.error("You can set it in .env file or as an OS environment variable:");
   console.error("  export POE_API_KEY=your_api_key");
   console.error("  or create .env file with: POE_API_KEY=your_api_key");
+}
+
+function printMissingProxyApiKeyHelp() {
+  console.error("POE_PROXY_API_KEY environment variable is required");
+  console.error("Set it to a private token that callers must send as:");
+  console.error("  Authorization: Bearer your_proxy_token");
+}
+
+function safeTokenEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
+}
+
+function getHeaderValue(headers, name) {
+  const value = headers[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function extractProxyToken(headers) {
+  const authorization = getHeaderValue(headers, "authorization");
+  if (typeof authorization === "string") {
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    if (match) return match[1].trim();
+  }
+
+  const proxyHeader =
+    getHeaderValue(headers, "x-proxy-api-key") ||
+    getHeaderValue(headers, "x-api-key");
+  return typeof proxyHeader === "string" ? proxyHeader.trim() : "";
+}
+
+function validateProxyAuthorization(headers, proxyApiKey) {
+  if (!proxyApiKey) {
+    return { statusCode: 503, error: "POE_PROXY_API_KEY is not configured" };
+  }
+
+  const token = extractProxyToken(headers);
+  if (!token) {
+    return { statusCode: 401, error: "Proxy authorization is required" };
+  }
+
+  if (!safeTokenEqual(token, proxyApiKey)) {
+    return { statusCode: 403, error: "Proxy authorization is invalid" };
+  }
+
+  return null;
 }
 
 function sendSSE(reply, event, data) {
@@ -269,6 +324,7 @@ export function buildAnthropicResponse(data, poePayload) {
 export function createServer({
   baseUrl = DEFAULT_BASE_URL,
   apiKey,
+  proxyApiKey,
   defaultModel = DEFAULT_MODEL,
   fetchImpl = fetch,
   debug = false,
@@ -280,6 +336,12 @@ export function createServer({
 
   fastify.post("/v1/messages", async (request, reply) => {
     try {
+      const authError = validateProxyAuthorization(request.headers, proxyApiKey);
+      if (authError) {
+        reply.code(authError.statusCode);
+        return { error: authError.error };
+      }
+
       const poePayload = buildPoePayload(request.body, defaultModel);
       debugLog(debug, "Poe payload:", poePayload);
 
@@ -511,11 +573,17 @@ export async function start(env = process.env) {
     printMissingApiKeyHelp();
     process.exit(1);
   }
+  if (!config.proxyApiKey) {
+    printMissingProxyApiKeyHelp();
+    process.exit(1);
+  }
 
   const fastify = createServer(config);
   try {
-    await fastify.listen({ port: config.port, host: "0.0.0.0" });
-    console.log(`Poe-Anthropic bridge listening on port ${config.port}`);
+    await fastify.listen({ port: config.port, host: config.host });
+    console.log(
+      `Poe-Anthropic bridge listening on ${config.host}:${config.port}`
+    );
     console.log(`Using Poe API at: ${config.baseUrl}`);
     console.log(`Default model: ${config.defaultModel}`);
   } catch (err) {
