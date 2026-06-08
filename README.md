@@ -1,92 +1,88 @@
-# Poe-Anthropic Bridge
+# poe-anthropic-proxy
 
-<!-- README-OVERVIEW-IMAGE -->
-![Project overview](docs/readme-overview.svg)
+## Overview
 
-A proxy server that bridges between Anthropic's Messages API format and Poe's OpenAI-compatible API.
+`garethpaul/poe-anthropic-proxy` is a Node.js or JavaScript project. Proxy requests from Poe Chat Completions API to Anthropic Format
 
-## Setup
+This README is based on the checked-in source, manifests, scripts, and repository metadata on the `main` branch. The project language mix found during review was: JavaScript (2).
 
-Install dependencies:
+## Repository Contents
+
+- `README.md` - project overview and local usage notes
+- `package.json` - JavaScript dependency and script metadata
+- `docs` - source or example code
+- `package-lock.json` - JavaScript dependency and script metadata
+- `SECURITY.md` - security reporting and disclosure guidance
+- `test` - source or example code
+- `VISION.md` - project direction and maintenance guardrails
+
+Additional scan context:
+
+- Source directories: docs, test
+- Dependency and build manifests: package-lock.json, package.json
+- Entry points or build surfaces: package.json
+- Test-looking files: docs/plans/2026-06-08-poe-anthropic-proxy-security-test-baseline.md, test/poe-proxy.test.js
+
+## Getting Started
+
+### Prerequisites
+
+- Git
+- Node.js and npm
+
+### Setup
 
 ```bash
+git clone https://github.com/garethpaul/poe-anthropic-proxy.git
+cd poe-anthropic-proxy
 npm install
 ```
 
-Use Node.js 20 or newer.
+The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
 
-Copy the sample environment file and configure your Poe API key:
+## Running or Using the Project
 
-```bash
-cp .env.example .env
-```
+- Run `npm start` for the default development command.
+- Run `npm run dev` for the development server when that script is appropriate.
 
-Required setting:
+Detected npm scripts:
 
-```env
-POE_API_KEY=your_poe_api_key_here
-```
+- `npm run audit` - `npm audit --audit-level=moderate`
+- `npm run dev` - `node --watch poe-proxy.js`
+- `npm run start` - `node poe-proxy.js`
+- `npm run test` - `node --test`
+- `npm run verify` - `npm test && npm run audit`
 
-Optional settings:
+## Testing and Verification
 
-- `POE_BASE_URL` - Poe API base URL. Defaults to `https://api.poe.com`.
-- `POE_MODEL` - Default Poe model. The code default is `GPT-4.1`; `.env.example` uses `Claude-Sonnet-4`.
-- `PORT` - Server port. Defaults to `3000`.
-- `DEBUG` - Enable debug logging with `true`, `1`, `yes`, or `on`.
+- `npm test`
 
-## Usage
+When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
-Start the server:
+## Configuration and Secrets
 
-```bash
-npm start
-```
+- Detected references to OpenAI. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
 
-For development with auto-reload:
+## Security and Privacy Notes
 
-```bash
-npm run dev
-```
+- Review changes touching authentication or token handling; examples from the scan include docs/plans/2026-06-08-poe-anthropic-proxy-security-test-baseline.md, poe-proxy.js, test/poe-proxy.test.js.
+- Review changes touching external API calls or credential-adjacent configuration; examples from the scan include docs/plans/2026-06-08-poe-anthropic-proxy-security-test-baseline.md, poe-proxy.js, test/poe-proxy.test.js.
+- Review changes touching network requests, sockets, or service endpoints; examples from the scan include poe-proxy.js, test/poe-proxy.test.js.
+- Review changes touching file, media, JSON, XML, CSV, OCR, or data parsing; examples from the scan include docs/plans/2026-06-08-poe-anthropic-proxy-security-test-baseline.md, poe-proxy.js, test/poe-proxy.test.js.
+- Review changes touching database, model, or persistence code; examples from the scan include docs/plans/2026-06-08-poe-anthropic-proxy-security-test-baseline.md, poe-proxy.js, test/poe-proxy.test.js.
 
-## Quality Gates
+## Maintenance Notes
 
-Run the deterministic local test suite:
+- See `SECURITY.md` for vulnerability reporting and safe research guidance.
+- See `VISION.md` for project direction and contribution guardrails.
 
-```bash
-npm test
-```
+## Contributing
 
-Check dependency advisories:
+Keep changes small and tied to the project that is already present in this repository. For code changes, document the toolchain used, avoid committing generated dependency directories or local configuration, and update this README when setup or verification steps change.
 
-```bash
-npm run audit
-```
+## Existing Project Notes
 
-Run both local gates together:
+Prior README summary:
 
-```bash
-npm run verify
-```
+> Poe-Anthropic Bridge <!-- README-OVERVIEW-IMAGE --> A proxy server that bridges between Anthropic's Messages API format and Poe's OpenAI-compatible API. Setup Install dependencies: Use Node.js 20 or newer. Copy the sample environment file and configure your Poe API key: Required setting:
 
-These commands run without a Poe API key and without live network calls to Poe.
-
-## Live Verification
-
-After setting `POE_API_KEY` and starting the server, test the proxy manually:
-
-```bash
-curl -X POST http://localhost:3000/v1/messages \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "messages": [{"role": "user", "content": "Hello!"}],
-    "max_tokens": 100
-  }'
-```
-
-## Claude Code
-
-Set `ANTHROPIC_BASE_URL`, then set a model with `/model Grok-4` as an example:
-
-```bash
-export ANTHROPIC_BASE_URL=http://0.0.0.0:3000
-```
