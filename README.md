@@ -1,5 +1,8 @@
 # poe-anthropic-proxy
 
+<!-- README-OVERVIEW-IMAGE -->
+![Project overview](docs/readme-overview.svg)
+
 ## Overview
 
 `garethpaul/poe-anthropic-proxy` is a Node.js or JavaScript project. Proxy requests from Poe Chat Completions API to Anthropic Format
@@ -85,4 +88,3 @@ Keep changes small and tied to the project that is already present in this repos
 Prior README summary:
 
 > Poe-Anthropic Bridge <!-- README-OVERVIEW-IMAGE --> A proxy server that bridges between Anthropic's Messages API format and Poe's OpenAI-compatible API. Setup Install dependencies: Use Node.js 20 or newer. Copy the sample environment file and configure your Poe API key: Required setting:
-
