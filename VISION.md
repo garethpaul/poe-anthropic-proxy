@@ -46,3 +46,6 @@ path visible in configuration and tests.
 - Silent request forwarding to unexpected hosts
 - Compatibility claims without tests
 - Broad protocol rewrites without fixture coverage
+
+This list is a roadmap guardrail, not a permanent rule.
+Strong user demand and strong technical rationale can change it.
