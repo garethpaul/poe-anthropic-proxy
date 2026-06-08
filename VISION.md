@@ -36,6 +36,11 @@ Contribution rules:
 
 ## Security And Responsible Use
 
+Canonical security policy and reporting:
+
+- [`SECURITY.md`](SECURITY.md)
+
+
 The proxy handles user prompts, tool calls, and API credentials. It should keep
 logging minimal by default, avoid credential exposure, and make any forwarding
 path visible in configuration and tests.
