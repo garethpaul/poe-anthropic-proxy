@@ -1,5 +1,8 @@
 # Poe-Anthropic Bridge
 
+<!-- README-OVERVIEW-IMAGE -->
+![Project overview](docs/readme-overview.svg)
+
 A proxy server that bridges between Anthropic's Messages API format and Poe's OpenAI-compatible API.
 
 ## Setup
