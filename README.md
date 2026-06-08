@@ -4,23 +4,32 @@ A proxy server that bridges between Anthropic's Messages API format and Poe's Op
 
 ## Setup
 
-1. Install dependencies:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Copy environment file and configure:
+Use Node.js 20 or newer.
+
+Copy the sample environment file and configure your Poe API key:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Edit `.env` and add your Poe API key:
+Required setting:
 
 ```env
 POE_API_KEY=your_poe_api_key_here
 ```
+
+Optional settings:
+
+- `POE_BASE_URL` - Poe API base URL. Defaults to `https://api.poe.com`.
+- `POE_MODEL` - Default Poe model. The code default is `GPT-4.1`; `.env.example` uses `Claude-Sonnet-4`.
+- `PORT` - Server port. Defaults to `3000`.
+- `DEBUG` - Enable debug logging with `true`, `1`, `yes`, or `on`.
 
 ## Usage
 
@@ -36,15 +45,31 @@ For development with auto-reload:
 npm run dev
 ```
 
-## Testing
+## Quality Gates
 
-Test the proxy:
+Run the deterministic local test suite:
 
 ```bash
 npm test
 ```
 
-Or manually:
+Check dependency advisories:
+
+```bash
+npm run audit
+```
+
+Run both local gates together:
+
+```bash
+npm run verify
+```
+
+These commands run without a Poe API key and without live network calls to Poe.
+
+## Live Verification
+
+After setting `POE_API_KEY` and starting the server, test the proxy manually:
 
 ```bash
 curl -X POST http://localhost:3000/v1/messages \
@@ -55,16 +80,10 @@ curl -X POST http://localhost:3000/v1/messages \
   }'
 ```
 
-## Environment Variables
-
-- `POE_API_KEY` - Your Poe API key (required)
-- `POE_BASE_URL` - Poe API base URL (default: https://api.poe.com)
-- `POE_MODEL` - Default model to use (default: Claude-3-5-Sonnet)
-- `PORT` - Server port (default: 3000)
-- `DEBUG` - Enable debug logging (default: false)
-
 ## Claude Code
 
-Set the ANTHROPIC_BASE_URL and then set a model with `/model Grok-4` as an example
+Set `ANTHROPIC_BASE_URL`, then set a model with `/model Grok-4` as an example:
 
-`export ANTHROPIC_BASE_URL=http://0.0.0.0:3000`
+```bash
+export ANTHROPIC_BASE_URL=http://0.0.0.0:3000
+```

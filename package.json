@@ -7,14 +7,13 @@
   "scripts": {
     "start": "node poe-proxy.js",
     "dev": "node --watch poe-proxy.js",
-    "test": "curl -X POST http://localhost:3000/v1/messages -H 'Content-Type: application/json' -d '{\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"max_tokens\":100}'"
+    "test": "node --test",
+    "audit": "npm audit --audit-level=moderate",
+    "verify": "npm test && npm run audit"
   },
   "dependencies": {
-    "fastify": "^4.26.2",
-    "dotenv": "^16.4.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.0"
+    "dotenv": "^17.4.2",
+    "fastify": "^5.8.5"
   },
   "keywords": [
     "anthropic",
@@ -26,6 +25,6 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

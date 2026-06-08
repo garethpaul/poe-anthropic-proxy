@@ -1,42 +1,51 @@
 #!/usr/bin/env node
 import Fastify from "fastify";
-import { TextDecoder } from "util";
+import { TextDecoder } from "node:util";
+import { fileURLToPath } from "node:url";
 import "dotenv/config";
 
-const baseUrl = process.env.POE_BASE_URL || "https://api.poe.com";
-const apiKey = process.env.POE_API_KEY;
-const defaultModel = process.env.POE_MODEL || "GPT-4.1";
+const DEFAULT_BASE_URL = "https://api.poe.com";
+const DEFAULT_MODEL = "GPT-4.1";
+const DEFAULT_PORT = 3000;
 
-if (!apiKey) {
-  console.error("POE_API_KEY environment variable is required");
-  console.error(
-    "You can set it in .env file or as an OS environment variable:"
+export function isDebugEnabled(value) {
+  return ["1", "true", "yes", "on"].includes(
+    String(value || "")
+      .trim()
+      .toLowerCase()
   );
+}
+
+export function loadConfig(env = process.env) {
+  return {
+    baseUrl: env.POE_BASE_URL || DEFAULT_BASE_URL,
+    apiKey: env.POE_API_KEY,
+    defaultModel: env.POE_MODEL || DEFAULT_MODEL,
+    port: env.PORT || DEFAULT_PORT,
+    debug: isDebugEnabled(env.DEBUG),
+  };
+}
+
+function debugLog(enabled, ...args) {
+  if (enabled) console.log(...args);
+}
+
+function printMissingApiKeyHelp() {
+  console.error("POE_API_KEY environment variable is required");
+  console.error("You can set it in .env file or as an OS environment variable:");
   console.error("  export POE_API_KEY=your_api_key");
   console.error("  or create .env file with: POE_API_KEY=your_api_key");
-  process.exit(1);
 }
 
-const fastify = Fastify({
-  logger: true,
-});
-
-function debug(...args) {
-  if (!process.env.DEBUG) return;
-  console.log(...args);
-}
-
-// Helper function to send SSE events and flush immediately.
-const sendSSE = (reply, event, data) => {
+function sendSSE(reply, event, data) {
   const sseMessage = `event: ${event}\n` + `data: ${JSON.stringify(data)}\n\n`;
   reply.raw.write(sseMessage);
-  // Flush if the flush method is available.
   if (typeof reply.raw.flush === "function") {
     reply.raw.flush();
   }
-};
+}
 
-function mapStopReason(finishReason) {
+export function mapStopReason(finishReason) {
   switch (finishReason) {
     case "tool_calls":
       return "tool_use";
@@ -49,7 +58,7 @@ function mapStopReason(finishReason) {
   }
 }
 
-function mapModelName(modelName) {
+export function mapModelName(modelName) {
   const modelMappings = {
     "claude-sonnet-4-20250514": "Claude-Sonnet-4",
     "claude-3-5-sonnet-20241022": "Claude-Sonnet-3.5",
@@ -63,423 +72,462 @@ function mapModelName(modelName) {
   return modelMappings[modelName] || modelName;
 }
 
-fastify.post("/v1/messages", async (request, reply) => {
-  try {
-    const payload = request.body;
+export function normalizeContent(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (typeof item?.text === "string") return item.text;
+        if (typeof item?.content === "string") return item.content;
+        return "";
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+  return null;
+}
 
-    // Helper to normalize a message's content.
-    // If content is a string, return it directly.
-    // If it's an array (of objects with text property), join them.
-    const normalizeContent = (content) => {
-      if (typeof content === "string") return content;
-      if (Array.isArray(content)) {
-        return content.map((item) => item.text).join(" ");
+export function buildPoeMessages(payload = {}) {
+  const messages = [];
+
+  if (typeof payload.system === "string") {
+    messages.push({
+      role: "system",
+      content: payload.system,
+    });
+  } else if (payload.system && Array.isArray(payload.system)) {
+    payload.system.forEach((sysMsg) => {
+      const normalized = normalizeContent(sysMsg.text || sysMsg.content);
+      if (normalized) {
+        messages.push({
+          role: "system",
+          content: normalized,
+        });
       }
-      return null;
-    };
+    });
+  }
 
-    // Build messages array for the Poe payload.
-    // Start with system messages if provided.
-    const messages = [];
-    if (payload.system && Array.isArray(payload.system)) {
-      payload.system.forEach((sysMsg) => {
-        const normalized = normalizeContent(sysMsg.text || sysMsg.content);
-        if (normalized) {
-          messages.push({
-            role: "system",
-            content: normalized,
-          });
-        }
-      });
-    }
-    // Then add user (or other) messages.
-    if (payload.messages && Array.isArray(payload.messages)) {
-      payload.messages.forEach((msg) => {
-        const toolCalls = (Array.isArray(msg.content) ? msg.content : [])
-          .filter((item) => item.type === "tool_use")
-          .map((toolCall) => ({
-            function: {
-              type: "function",
-              id: toolCall.id,
-              function: {
-                name: toolCall.name,
-                parameters: toolCall.input,
-              },
-            },
-          }));
-        const newMsg = { role: msg.role };
-        const normalized = normalizeContent(msg.content);
-        if (normalized) newMsg.content = normalized;
-        if (toolCalls.length > 0) newMsg.tool_calls = toolCalls;
-        if (newMsg.content || newMsg.tool_calls) messages.push(newMsg);
+  if (payload.messages && Array.isArray(payload.messages)) {
+    payload.messages.forEach((msg) => {
+      const toolCalls = (Array.isArray(msg.content) ? msg.content : [])
+        .filter((item) => item.type === "tool_use")
+        .map((toolCall) => ({
+          id: toolCall.id,
+          type: "function",
+          function: {
+            name: toolCall.name,
+            arguments: JSON.stringify(toolCall.input || {}),
+          },
+        }));
 
-        if (Array.isArray(msg.content)) {
-          const toolResults = msg.content.filter(
-            (item) => item.type === "tool_result"
-          );
-          toolResults.forEach((toolResult) => {
+      const newMsg = { role: msg.role };
+      const normalized = normalizeContent(msg.content);
+      if (normalized) newMsg.content = normalized;
+      if (toolCalls.length > 0) newMsg.tool_calls = toolCalls;
+      if (newMsg.content || newMsg.tool_calls) messages.push(newMsg);
+
+      if (Array.isArray(msg.content)) {
+        msg.content
+          .filter((item) => item.type === "tool_result")
+          .forEach((toolResult) => {
             messages.push({
               role: "tool",
-              content: toolResult.text || toolResult.content,
+              content:
+                normalizeContent(toolResult.text || toolResult.content) || "",
               tool_call_id: toolResult.tool_use_id,
             });
           });
-        }
-      });
-    }
-
-    // Prepare the Poe payload.
-    // Helper function to recursively traverse JSON schema and remove format: 'uri'
-    const removeUriFormat = (schema) => {
-      if (!schema || typeof schema !== "object") return schema;
-
-      // If this is a string type with uri format, remove the format
-      if (schema.type === "string" && schema.format === "uri") {
-        const { format, ...rest } = schema;
-        return rest;
       }
-
-      // Handle array of schemas (like in anyOf, allOf, oneOf)
-      if (Array.isArray(schema)) {
-        return schema.map((item) => removeUriFormat(item));
-      }
-
-      // Recursively process all properties
-      const result = {};
-      for (const key in schema) {
-        if (key === "properties" && typeof schema[key] === "object") {
-          result[key] = {};
-          for (const propKey in schema[key]) {
-            result[key][propKey] = removeUriFormat(schema[key][propKey]);
-          }
-        } else if (key === "items" && typeof schema[key] === "object") {
-          result[key] = removeUriFormat(schema[key]);
-        } else if (
-          key === "additionalProperties" &&
-          typeof schema[key] === "object"
-        ) {
-          result[key] = removeUriFormat(schema[key]);
-        } else if (
-          ["anyOf", "allOf", "oneOf"].includes(key) &&
-          Array.isArray(schema[key])
-        ) {
-          result[key] = schema[key].map((item) => removeUriFormat(item));
-        } else {
-          result[key] = removeUriFormat(schema[key]);
-        }
-      }
-      return result;
-    };
-
-    const tools = (payload.tools || [])
-      .filter((tool) => !["BatchTool"].includes(tool.name))
-      .map((tool) => ({
-        type: "function",
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: removeUriFormat(tool.input_schema),
-        },
-      }));
-
-    // Poe API expects OpenAI-compatible format
-    const poePayload = {
-      model: mapModelName(payload.model || defaultModel),
-      messages,
-      max_tokens: payload.max_tokens,
-      temperature: payload.temperature !== undefined ? payload.temperature : 1,
-      stream: payload.stream === true,
-    };
-    if (tools.length > 0) poePayload.tools = tools;
-    debug("Poe payload:", poePayload);
-
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    };
-
-    const poeResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(poePayload),
     });
+  }
 
-    if (!poeResponse.ok) {
-      const errorDetails = await poeResponse.text();
-      console.error(
-        `Poe API Error: ${poeResponse.status} ${poeResponse.statusText}`
-      );
-      console.error(`Error details: ${errorDetails}`);
-      console.error(`Request model: ${poePayload.model}`);
-      console.error(`Request URL: ${baseUrl}/v1/chat/completions`);
-      reply.code(poeResponse.status);
-      return { error: errorDetails };
-    }
+  return messages;
+}
 
-    // If stream is not enabled, process the complete response.
-    if (!poePayload.stream) {
-      const data = await poeResponse.json();
-      debug("Poe response:", data);
-      if (data.error) {
-        throw new Error(data.error.message);
+export function removeUriFormat(schema) {
+  if (!schema || typeof schema !== "object") return schema;
+
+  if (schema.type === "string" && schema.format === "uri") {
+    const { format, ...rest } = schema;
+    return rest;
+  }
+
+  if (Array.isArray(schema)) {
+    return schema.map((item) => removeUriFormat(item));
+  }
+
+  const result = {};
+  for (const key in schema) {
+    if (key === "properties" && typeof schema[key] === "object") {
+      result[key] = {};
+      for (const propKey in schema[key]) {
+        result[key][propKey] = removeUriFormat(schema[key][propKey]);
       }
+    } else if (key === "items" && typeof schema[key] === "object") {
+      result[key] = removeUriFormat(schema[key]);
+    } else if (
+      key === "additionalProperties" &&
+      typeof schema[key] === "object"
+    ) {
+      result[key] = removeUriFormat(schema[key]);
+    } else if (
+      ["anyOf", "allOf", "oneOf"].includes(key) &&
+      Array.isArray(schema[key])
+    ) {
+      result[key] = schema[key].map((item) => removeUriFormat(item));
+    } else {
+      result[key] = removeUriFormat(schema[key]);
+    }
+  }
+  return result;
+}
 
-      const choice = data.choices[0];
-      const poeMessage = choice.message;
+export function buildPoeTools(tools = []) {
+  return tools
+    .filter((tool) => !["BatchTool"].includes(tool.name))
+    .map((tool) => ({
+      type: "function",
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: removeUriFormat(tool.input_schema),
+      },
+    }));
+}
 
-      // Map finish_reason to anthropic stop_reason.
-      const stopReason = mapStopReason(choice.finish_reason);
-      const toolCalls = poeMessage.tool_calls || [];
+export function buildPoePayload(payload = {}, defaultModel = DEFAULT_MODEL) {
+  const messages = buildPoeMessages(payload);
+  const tools = buildPoeTools(payload.tools || []);
+  const poePayload = {
+    model: mapModelName(payload.model || defaultModel),
+    messages,
+    max_tokens: payload.max_tokens,
+    temperature: payload.temperature !== undefined ? payload.temperature : 1,
+    stream: payload.stream === true,
+  };
 
-      // Create a message id; if available, replace prefix, otherwise generate one.
-      const messageId = data.id
-        ? data.id.replace("chatcmpl", "msg")
-        : "msg_" + Math.random().toString(36).substr(2, 24);
+  if (tools.length > 0) poePayload.tools = tools;
+  return poePayload;
+}
 
-      const anthropicResponse = {
-        content: [
+function estimateTokens(text) {
+  if (!text) return 0;
+  return String(text).trim().split(/\s+/).filter(Boolean).length;
+}
+
+export function buildAnthropicResponse(data, poePayload) {
+  if (data.error) {
+    throw new Error(data.error.message);
+  }
+
+  const choice = data.choices[0];
+  const poeMessage = choice.message;
+  const toolCalls = poeMessage.tool_calls || [];
+  const textContent =
+    poeMessage.content === null || poeMessage.content === undefined
+      ? []
+      : [
           {
             text: poeMessage.content,
             type: "text",
           },
-          ...toolCalls.map((toolCall) => ({
-            type: "tool_use",
-            id: toolCall.id,
-            name: toolCall.function.name,
-            input: JSON.parse(toolCall.function.arguments),
-          })),
-        ].filter((item) => item.text !== null || item.type === "tool_use"),
-        id: messageId,
-        model: poePayload.model,
-        role: poeMessage.role,
-        stop_reason: stopReason,
-        stop_sequence: null,
-        type: "message",
-        usage: {
-          input_tokens: data.usage
-            ? data.usage.prompt_tokens
-            : messages.reduce(
-                (acc, msg) => acc + (msg.content || "").split(" ").length,
-                0
-              ),
-          output_tokens: data.usage
-            ? data.usage.completion_tokens
-            : (poeMessage.content || "").split(" ").length,
-        },
+        ];
+
+  return {
+    content: [
+      ...textContent,
+      ...toolCalls.map((toolCall) => ({
+        type: "tool_use",
+        id: toolCall.id,
+        name: toolCall.function.name,
+        input: JSON.parse(toolCall.function.arguments),
+      })),
+    ],
+    id: data.id
+      ? data.id.replace("chatcmpl", "msg")
+      : "msg_" + Math.random().toString(36).substr(2, 24),
+    model: poePayload.model,
+    role: poeMessage.role,
+    stop_reason: mapStopReason(choice.finish_reason),
+    stop_sequence: null,
+    type: "message",
+    usage: {
+      input_tokens: data.usage
+        ? data.usage.prompt_tokens
+        : poePayload.messages.reduce(
+            (acc, msg) => acc + estimateTokens(msg.content),
+            0
+          ),
+      output_tokens: data.usage
+        ? data.usage.completion_tokens
+        : estimateTokens(poeMessage.content),
+    },
+  };
+}
+
+export function createServer({
+  baseUrl = DEFAULT_BASE_URL,
+  apiKey,
+  defaultModel = DEFAULT_MODEL,
+  fetchImpl = fetch,
+  debug = false,
+  logger = true,
+} = {}) {
+  const fastify = Fastify({
+    logger,
+  });
+
+  fastify.post("/v1/messages", async (request, reply) => {
+    try {
+      const poePayload = buildPoePayload(request.body, defaultModel);
+      debugLog(debug, "Poe payload:", poePayload);
+
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       };
 
-      return anthropicResponse;
-    }
-
-    let isSucceeded = false;
-    function sendSuccessMessage() {
-      if (isSucceeded) return;
-      isSucceeded = true;
-
-      // Streaming response using Server-Sent Events.
-      reply.raw.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
+      const poeResponse = await fetchImpl(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(poePayload),
       });
 
-      // Create a unique message id.
-      const messageId = "msg_" + Math.random().toString(36).substr(2, 24);
+      if (!poeResponse.ok) {
+        const errorDetails = await poeResponse.text();
+        console.error(
+          `Poe API Error: ${poeResponse.status} ${poeResponse.statusText}`
+        );
+        console.error(`Error details: ${errorDetails}`);
+        console.error(`Request model: ${poePayload.model}`);
+        console.error(`Request URL: ${baseUrl}/v1/chat/completions`);
+        reply.code(poeResponse.status);
+        return { error: errorDetails };
+      }
 
-      // Send initial SSE event for message start.
-      sendSSE(reply, "message_start", {
-        type: "message_start",
-        message: {
-          id: messageId,
-          type: "message",
-          role: "assistant",
-          model: poePayload.model,
-          content: [],
-          stop_reason: null,
-          stop_sequence: null,
-          usage: { input_tokens: 0, output_tokens: 0 },
-        },
-      });
+      if (!poePayload.stream) {
+        const data = await poeResponse.json();
+        debugLog(debug, "Poe response:", data);
+        return buildAnthropicResponse(data, poePayload);
+      }
 
-      // Send initial ping.
-      sendSSE(reply, "ping", { type: "ping" });
-    }
+      let isSucceeded = false;
+      function sendSuccessMessage() {
+        if (isSucceeded) return;
+        isSucceeded = true;
 
-    // Prepare for reading streamed data.
-    let accumulatedContent = "";
-    let accumulatedReasoning = "";
-    let usage = null;
-    let textBlockStarted = false;
-    let encounteredToolCall = false;
-    const toolCallAccumulators = {}; // key: tool call index, value: accumulated arguments string
-    const decoder = new TextDecoder("utf-8");
-    const reader = poeResponse.body.getReader();
-    let done = false;
+        reply.raw.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        });
 
-    while (!done) {
-      const { value, done: doneReading } = await reader.read();
-      done = doneReading;
-      if (value) {
-        const chunk = decoder.decode(value);
-        debug("Poe response chunk:", chunk);
-        // Poe streaming responses are typically sent as lines prefixed with "data: "
-        const lines = chunk.split("\n");
+        const messageId = "msg_" + Math.random().toString(36).substr(2, 24);
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed === "" || !trimmed.startsWith("data:")) continue;
-          const dataStr = trimmed.replace(/^data:\s*/, "");
-          if (dataStr === "[DONE]") {
-            // Finalize the stream with stop events.
-            if (encounteredToolCall) {
-              for (const idx in toolCallAccumulators) {
+        sendSSE(reply, "message_start", {
+          type: "message_start",
+          message: {
+            id: messageId,
+            type: "message",
+            role: "assistant",
+            model: poePayload.model,
+            content: [],
+            stop_reason: null,
+            stop_sequence: null,
+            usage: { input_tokens: 0, output_tokens: 0 },
+          },
+        });
+
+        sendSSE(reply, "ping", { type: "ping" });
+      }
+
+      let accumulatedContent = "";
+      let accumulatedReasoning = "";
+      let usage = null;
+      let textBlockStarted = false;
+      let encounteredToolCall = false;
+      const toolCallAccumulators = {};
+      const decoder = new TextDecoder("utf-8");
+      const reader = poeResponse.body.getReader();
+      let done = false;
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          const chunk = decoder.decode(value);
+          debugLog(debug, "Poe response chunk:", chunk);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === "" || !trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.replace(/^data:\s*/, "");
+            if (dataStr === "[DONE]") {
+              if (encounteredToolCall) {
+                for (const idx in toolCallAccumulators) {
+                  sendSSE(reply, "content_block_stop", {
+                    type: "content_block_stop",
+                    index: parseInt(idx, 10),
+                  });
+                }
+              } else if (textBlockStarted) {
                 sendSSE(reply, "content_block_stop", {
                   type: "content_block_stop",
-                  index: parseInt(idx, 10),
+                  index: 0,
                 });
               }
-            } else if (textBlockStarted) {
-              sendSSE(reply, "content_block_stop", {
-                type: "content_block_stop",
-                index: 0,
+              sendSSE(reply, "message_delta", {
+                type: "message_delta",
+                delta: {
+                  stop_reason: encounteredToolCall ? "tool_use" : "end_turn",
+                  stop_sequence: null,
+                },
+                usage: usage
+                  ? { output_tokens: usage.completion_tokens }
+                  : {
+                      output_tokens:
+                        estimateTokens(accumulatedContent) +
+                        estimateTokens(accumulatedReasoning),
+                    },
               });
+              sendSSE(reply, "message_stop", {
+                type: "message_stop",
+              });
+              reply.raw.end();
+              return;
             }
-            sendSSE(reply, "message_delta", {
-              type: "message_delta",
-              delta: {
-                stop_reason: encounteredToolCall ? "tool_use" : "end_turn",
-                stop_sequence: null,
-              },
-              usage: usage
-                ? { output_tokens: usage.completion_tokens }
-                : {
-                    output_tokens:
-                      accumulatedContent.split(" ").length +
-                      accumulatedReasoning.split(" ").length,
-                  },
-            });
-            sendSSE(reply, "message_stop", {
-              type: "message_stop",
-            });
-            reply.raw.end();
-            return;
-          }
 
-          let parsed;
-          try {
-            parsed = JSON.parse(dataStr);
-          } catch (err) {
-            debug("Failed to parse JSON:", dataStr);
-            continue;
-          }
-          if (parsed.error) {
-            throw new Error(parsed.error.message);
-          }
-          sendSuccessMessage();
-          // Capture usage if available.
-          if (parsed.usage) {
-            usage = parsed.usage;
-          }
-          const delta = parsed.choices[0].delta;
-          if (delta && delta.tool_calls) {
-            for (const toolCall of delta.tool_calls) {
-              encounteredToolCall = true;
-              const idx = toolCall.index;
-              if (toolCallAccumulators[idx] === undefined) {
-                toolCallAccumulators[idx] = "";
+            let parsed;
+            try {
+              parsed = JSON.parse(dataStr);
+            } catch (err) {
+              debugLog(debug, "Failed to parse JSON:", dataStr);
+              continue;
+            }
+            if (parsed.error) {
+              throw new Error(parsed.error.message);
+            }
+            sendSuccessMessage();
+            if (parsed.usage) {
+              usage = parsed.usage;
+            }
+            const delta = parsed.choices[0].delta;
+            if (delta && delta.tool_calls) {
+              for (const toolCall of delta.tool_calls) {
+                encounteredToolCall = true;
+                const idx = toolCall.index;
+                const functionDelta = toolCall.function || {};
+                if (toolCallAccumulators[idx] === undefined) {
+                  toolCallAccumulators[idx] = "";
+                  sendSSE(reply, "content_block_start", {
+                    type: "content_block_start",
+                    index: idx,
+                    content_block: {
+                      type: "tool_use",
+                      id: toolCall.id,
+                      name: functionDelta.name,
+                      input: {},
+                    },
+                  });
+                }
+                const newArgs = functionDelta.arguments || "";
+                const oldArgs = toolCallAccumulators[idx];
+                if (newArgs.length > oldArgs.length) {
+                  const deltaText = newArgs.substring(oldArgs.length);
+                  sendSSE(reply, "content_block_delta", {
+                    type: "content_block_delta",
+                    index: idx,
+                    delta: {
+                      type: "input_json_delta",
+                      partial_json: deltaText,
+                    },
+                  });
+                  toolCallAccumulators[idx] = newArgs;
+                }
+              }
+            } else if (delta && delta.content) {
+              if (!textBlockStarted) {
+                textBlockStarted = true;
                 sendSSE(reply, "content_block_start", {
                   type: "content_block_start",
-                  index: idx,
+                  index: 0,
                   content_block: {
-                    type: "tool_use",
-                    id: toolCall.id,
-                    name: toolCall.function.name,
-                    input: {},
+                    type: "text",
+                    text: "",
                   },
                 });
               }
-              const newArgs = toolCall.function.arguments || "";
-              const oldArgs = toolCallAccumulators[idx];
-              if (newArgs.length > oldArgs.length) {
-                const deltaText = newArgs.substring(oldArgs.length);
-                sendSSE(reply, "content_block_delta", {
-                  type: "content_block_delta",
-                  index: idx,
-                  delta: {
-                    type: "input_json_delta",
-                    partial_json: deltaText,
+              accumulatedContent += delta.content;
+              sendSSE(reply, "content_block_delta", {
+                type: "content_block_delta",
+                index: 0,
+                delta: {
+                  type: "text_delta",
+                  text: delta.content,
+                },
+              });
+            } else if (delta && delta.reasoning) {
+              if (!textBlockStarted) {
+                textBlockStarted = true;
+                sendSSE(reply, "content_block_start", {
+                  type: "content_block_start",
+                  index: 0,
+                  content_block: {
+                    type: "text",
+                    text: "",
                   },
                 });
-                toolCallAccumulators[idx] = newArgs;
               }
-            }
-          } else if (delta && delta.content) {
-            if (!textBlockStarted) {
-              textBlockStarted = true;
-              sendSSE(reply, "content_block_start", {
-                type: "content_block_start",
+              accumulatedReasoning += delta.reasoning;
+              sendSSE(reply, "content_block_delta", {
+                type: "content_block_delta",
                 index: 0,
-                content_block: {
-                  type: "text",
-                  text: "",
+                delta: {
+                  type: "thinking_delta",
+                  thinking: delta.reasoning,
                 },
               });
             }
-            accumulatedContent += delta.content;
-            sendSSE(reply, "content_block_delta", {
-              type: "content_block_delta",
-              index: 0,
-              delta: {
-                type: "text_delta",
-                text: delta.content,
-              },
-            });
-          } else if (delta && delta.reasoning) {
-            if (!textBlockStarted) {
-              textBlockStarted = true;
-              sendSSE(reply, "content_block_start", {
-                type: "content_block_start",
-                index: 0,
-                content_block: {
-                  type: "text",
-                  text: "",
-                },
-              });
-            }
-            accumulatedReasoning += delta.reasoning;
-            sendSSE(reply, "content_block_delta", {
-              type: "content_block_delta",
-              index: 0,
-              delta: {
-                type: "thinking_delta",
-                thinking: delta.reasoning,
-              },
-            });
           }
         }
       }
+
+      reply.raw.end();
+    } catch (err) {
+      console.error(err);
+      reply.code(500);
+      return { error: err.message };
     }
+  });
 
-    reply.raw.end();
-  } catch (err) {
-    console.error(err);
-    reply.code(500);
-    return { error: err.message };
+  return fastify;
+}
+
+export async function start(env = process.env) {
+  const config = loadConfig(env);
+  if (!config.apiKey) {
+    printMissingApiKeyHelp();
+    process.exit(1);
   }
-});
 
-const start = async () => {
+  const fastify = createServer(config);
   try {
-    await fastify.listen({ port: process.env.PORT || 3000, host: "0.0.0.0" });
-    console.log(
-      `Poe-Anthropic bridge listening on port ${process.env.PORT || 3000}`
-    );
-    console.log(`Using Poe API at: ${baseUrl}`);
-    console.log(`Default model: ${defaultModel}`);
+    await fastify.listen({ port: config.port, host: "0.0.0.0" });
+    console.log(`Poe-Anthropic bridge listening on port ${config.port}`);
+    console.log(`Using Poe API at: ${config.baseUrl}`);
+    console.log(`Default model: ${config.defaultModel}`);
   } catch (err) {
     console.error("Error starting server:", err);
     process.exit(1);
   }
-};
+}
 
-start();
+function isMainModule() {
+  return process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+}
+
+if (isMainModule()) {
+  start();
+}
