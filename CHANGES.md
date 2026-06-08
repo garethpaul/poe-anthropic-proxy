@@ -7,3 +7,5 @@
 - Bound the local server to `127.0.0.1` by default unless `HOST` is explicitly
   configured.
 - Added deterministic route tests for missing and invalid proxy credentials.
+- Updated `.env.example` and tests so required proxy-auth placeholders stay in
+  sync with startup requirements.

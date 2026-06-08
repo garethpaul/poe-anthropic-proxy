@@ -43,6 +43,9 @@ export POE_API_KEY=...
 export POE_PROXY_API_KEY=...
 ```
 
+`.env.example` lists the required upstream Poe key, inbound proxy key, and
+localhost binding defaults.
+
 The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
 
 ## Running or Using the Project
@@ -80,6 +83,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - Detected references to OpenAI. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
 - `POE_API_KEY` is the upstream Poe credential and must stay server-side.
 - `POE_PROXY_API_KEY` is the inbound caller token required by `/v1/messages`.
+- `.env.example` documents placeholders for both credentials; replace them with
+  private deployment values and do not commit real `.env` files.
 - `HOST` defaults to `127.0.0.1`; avoid `0.0.0.0` unless the proxy is behind
   another authenticated boundary.
 

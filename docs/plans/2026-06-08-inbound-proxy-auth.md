@@ -22,6 +22,8 @@ default.
 - R5. Local server binding must default to `127.0.0.1` and remain configurable
   through `HOST`.
 - R6. README, CHANGES, and the bug note must document the new auth boundary.
+- R7. `.env.example` must document `POE_PROXY_API_KEY` and the localhost
+  default so sample setup matches startup requirements.
 
 ## Verification
 

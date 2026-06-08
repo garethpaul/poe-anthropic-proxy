@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildAnthropicResponse,
@@ -12,6 +13,10 @@ import {
   mapStopReason,
   removeUriFormat,
 } from "../poe-proxy.js";
+
+function readProjectFile(path) {
+  return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+}
 
 test("buildPoeMessages converts Anthropic messages to Poe chat messages", () => {
   const messages = buildPoeMessages({
@@ -168,6 +173,23 @@ test("loadConfig binds localhost by default and reads proxy auth", () => {
   assert.equal(config.host, "127.0.0.1");
   assert.equal(config.proxyApiKey, "proxy-key");
   assert.equal(loadConfig({ HOST: "0.0.0.0" }).host, "0.0.0.0");
+});
+
+test(".env.example documents required proxy credentials", () => {
+  const example = readProjectFile(".env.example");
+  for (const name of [
+    "POE_API_KEY",
+    "POE_PROXY_API_KEY",
+    "POE_BASE_URL",
+    "POE_MODEL",
+    "HOST",
+    "PORT",
+  ]) {
+    assert.match(example, new RegExp(`^${name}=.+$`, "m"));
+  }
+
+  assert.match(example, /^HOST=127\.0\.0\.1$/m);
+  assert.match(example, /^POE_PROXY_API_KEY=your_private_proxy_token_here$/m);
 });
 
 test("buildAnthropicResponse maps non-streaming Poe text responses", () => {
