@@ -62,6 +62,25 @@ When the required SDK or runtime is unavailable, use static checks and source re
 ## Configuration and Secrets
 
 - Detected references to OpenAI. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
+- `POE_API_KEY` is required for upstream Poe access.
+- `PROXY_AUTH_TOKEN` is required for callers of this proxy. Send it as `Authorization: Bearer <token>` on every `/v1/messages` request.
+- `ALLOW_UNAUTHENTICATED_PROXY=true` is only for local experiments; public deployments should leave it unset or `false`.
+
+Example local configuration:
+
+```bash
+export POE_API_KEY="your_poe_api_key_here"
+export PROXY_AUTH_TOKEN="$(openssl rand -hex 32)"
+```
+
+Example authenticated request:
+
+```bash
+curl http://localhost:3000/v1/messages \
+  -H "content-type: application/json" \
+  -H "authorization: Bearer $PROXY_AUTH_TOKEN" \
+  -d '{"messages":[{"role":"user","content":"hello"}],"max_tokens":32}'
+```
 
 ## Security and Privacy Notes
 
@@ -85,4 +104,3 @@ Keep changes small and tied to the project that is already present in this repos
 Prior README summary:
 
 > Poe-Anthropic Bridge <!-- README-OVERVIEW-IMAGE --> A proxy server that bridges between Anthropic's Messages API format and Poe's OpenAI-compatible API. Setup Install dependencies: Use Node.js 20 or newer. Copy the sample environment file and configure your Poe API key: Required setting:
-

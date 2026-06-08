@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import Fastify from "fastify";
+import { timingSafeEqual } from "node:crypto";
 import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
@@ -20,6 +21,8 @@ export function loadConfig(env = process.env) {
   return {
     baseUrl: env.POE_BASE_URL || DEFAULT_BASE_URL,
     apiKey: env.POE_API_KEY,
+    proxyAuthToken: env.PROXY_AUTH_TOKEN,
+    allowUnauthenticated: isDebugEnabled(env.ALLOW_UNAUTHENTICATED_PROXY),
     defaultModel: env.POE_MODEL || DEFAULT_MODEL,
     port: env.PORT || DEFAULT_PORT,
     debug: isDebugEnabled(env.DEBUG),
@@ -35,6 +38,39 @@ function printMissingApiKeyHelp() {
   console.error("You can set it in .env file or as an OS environment variable:");
   console.error("  export POE_API_KEY=your_api_key");
   console.error("  or create .env file with: POE_API_KEY=your_api_key");
+}
+
+function printMissingProxyAuthHelp() {
+  console.error("PROXY_AUTH_TOKEN environment variable is required");
+  console.error("Set it to a separate bearer token for callers of this proxy:");
+  console.error("  export PROXY_AUTH_TOKEN=$(openssl rand -hex 32)");
+  console.error(
+    "For local-only experiments, set ALLOW_UNAUTHENTICATED_PROXY=true explicitly."
+  );
+}
+
+function bearerTokenFromRequest(request) {
+  const authorization = request.headers.authorization;
+  if (typeof authorization !== "string") return null;
+
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
+}
+
+export function isProxyRequestAuthorized(
+  request,
+  proxyAuthToken,
+  allowUnauthenticated = false
+) {
+  if (allowUnauthenticated) return true;
+  if (!proxyAuthToken) return false;
+
+  const bearerToken = bearerTokenFromRequest(request);
+  if (!bearerToken) return false;
+
+  const expected = Buffer.from(proxyAuthToken);
+  const actual = Buffer.from(bearerToken);
+  return expected.length === actual.length && timingSafeEqual(actual, expected);
 }
 
 function sendSSE(reply, event, data) {
@@ -269,6 +305,8 @@ export function buildAnthropicResponse(data, poePayload) {
 export function createServer({
   baseUrl = DEFAULT_BASE_URL,
   apiKey,
+  proxyAuthToken,
+  allowUnauthenticated = false,
   defaultModel = DEFAULT_MODEL,
   fetchImpl = fetch,
   debug = false,
@@ -280,6 +318,21 @@ export function createServer({
 
   fastify.post("/v1/messages", async (request, reply) => {
     try {
+      if (
+        !isProxyRequestAuthorized(
+          request,
+          proxyAuthToken,
+          allowUnauthenticated
+        )
+      ) {
+        reply.header(
+          "WWW-Authenticate",
+          'Bearer realm="poe-anthropic-proxy"'
+        );
+        reply.code(401);
+        return { error: "Unauthorized" };
+      }
+
       const poePayload = buildPoePayload(request.body, defaultModel);
       debugLog(debug, "Poe payload:", poePayload);
 
@@ -510,6 +563,17 @@ export async function start(env = process.env) {
   if (!config.apiKey) {
     printMissingApiKeyHelp();
     process.exit(1);
+  }
+
+  if (!config.proxyAuthToken && !config.allowUnauthenticated) {
+    printMissingProxyAuthHelp();
+    process.exit(1);
+  }
+
+  if (config.allowUnauthenticated) {
+    console.error(
+      "WARNING: ALLOW_UNAUTHENTICATED_PROXY=true exposes this proxy without caller authentication."
+    );
   }
 
   const fastify = createServer(config);
