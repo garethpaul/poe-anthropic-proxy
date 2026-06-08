@@ -40,7 +40,7 @@ The proxy handles user prompts, tool calls, and API credentials. It should keep
 logging minimal by default, avoid credential exposure, and make any forwarding
 path visible in configuration and tests.
 
-## What We Will Not Merge For Now
+## What We Will Not Merge (For Now)
 
 - Credential logging or checked-in keys
 - Silent request forwarding to unexpected hosts
