@@ -82,9 +82,3 @@ When the required SDK or runtime is unavailable, use static checks and source re
 ## Contributing
 
 Keep changes small and tied to the project that is already present in this repository. For code changes, document the toolchain used, avoid committing generated dependency directories or local configuration, and update this README when setup or verification steps change.
-
-## Existing Project Notes
-
-Prior README summary:
-
-> Poe-Anthropic Bridge A proxy server that bridges between Anthropic's Messages API format and Poe's OpenAI-compatible API. Setup Install dependencies: Use Node.js 20 or newer. Copy the sample environment file and configure your Poe API key: Required setting:
