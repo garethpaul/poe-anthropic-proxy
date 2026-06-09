@@ -68,6 +68,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   error before Anthropic tool-use content is returned.
 - Malformed Poe tool definitions are ignored before forwarding so bad request
   tool metadata does not crash payload conversion.
+- Tool definitions with missing or invalid names or schemas are omitted locally
+  instead of being forwarded to Poe.
 
 Detected npm scripts:
 
@@ -117,6 +119,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   of leaking generic JSON parse failures.
 - Malformed Poe tool definitions are ignored before forwarding instead of
   leaking generic request-shape failures.
+- Invalid Poe tool names or schemas are treated as malformed definitions and
+  omitted before forwarding.
 
 ## Security and Privacy Notes
 

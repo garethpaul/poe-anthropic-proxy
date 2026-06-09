@@ -26,6 +26,7 @@ Priority:
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests
+- Keep Poe tool names and schemas validated before upstream forwarding
 
 Next priorities:
 

@@ -9,6 +9,7 @@ const DEFAULT_BASE_URL = "https://api.poe.com";
 const DEFAULT_MODEL = "GPT-4.1";
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;
+const POE_TOOL_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function isDebugEnabled(value) {
   return ["1", "true", "yes", "on"].includes(
@@ -256,16 +257,25 @@ export function removeUriFormat(schema) {
   return result;
 }
 
+function isValidPoeTool(tool) {
+  return (
+    tool &&
+    typeof tool === "object" &&
+    !Array.isArray(tool) &&
+    tool.name !== "BatchTool" &&
+    typeof tool.name === "string" &&
+    POE_TOOL_NAME_RE.test(tool.name) &&
+    tool.input_schema &&
+    typeof tool.input_schema === "object" &&
+    !Array.isArray(tool.input_schema)
+  );
+}
+
 export function buildPoeTools(tools = []) {
   if (!Array.isArray(tools)) return [];
 
   return tools
-    .filter(
-      (tool) =>
-        tool &&
-        typeof tool === "object" &&
-        !["BatchTool"].includes(tool.name)
-    )
+    .filter((tool) => isValidPoeTool(tool))
     .map((tool) => ({
       type: "function",
       function: {

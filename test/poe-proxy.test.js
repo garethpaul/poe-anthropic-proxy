@@ -147,6 +147,10 @@ test("buildPoePayload ignores malformed tool definitions", () => {
       null,
       "not-a-tool",
       { name: "BatchTool", input_schema: { type: "object" } },
+      { description: "Missing name", input_schema: { type: "object" } },
+      { name: "bad tool name", input_schema: { type: "object" } },
+      { name: "missing_schema" },
+      { name: "array_schema", input_schema: [] },
       {
         name: "lookup_weather",
         description: "Lookup weather",
@@ -452,13 +456,26 @@ test("malformed Poe tool definition guard is documented and preserved", () => {
   );
 
   assert.match(source, /if \(!Array\.isArray\(tools\)\) return \[\]/);
-  assert.match(source, /typeof tool === "object"/);
+  assert.match(source, /function isValidPoeTool/);
+  assert.match(source, /POE_TOOL_NAME_RE/);
+  assert.match(source, /!Array\.isArray\(tool\.input_schema\)/);
   assert.match(readme, /malformed Poe tool definitions/i);
+  assert.match(readme, /invalid names or schemas/i);
   assert.match(security, /malformed Poe tool definitions/i);
+  assert.match(security, /invalid tool names or schemas/i);
   assert.match(vision, /malformed tool definitions/);
+  assert.match(vision, /tool names and schemas/);
   assert.match(changes, /malformed Poe tool definitions/);
+  assert.match(changes, /invalid Poe tool names or schemas/);
   assert.match(plan, /status: completed/);
   assert.match(plan, /buildPoeTools/);
+
+  const nameSchemaPlan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-tool-name-schema-validation.md"
+  );
+  assert.match(nameSchemaPlan, /status: completed/);
+  assert.match(nameSchemaPlan, /input_schema/);
+  assert.match(nameSchemaPlan, /npm test/);
 });
 
 test("buildAnthropicResponse maps tool calls and fallback usage", () => {

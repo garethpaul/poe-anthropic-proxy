@@ -50,6 +50,8 @@ Malformed Poe tool call arguments should fail with explicit local mapping
 errors instead of generic JSON parse failures.
 Malformed Poe tool definitions should be ignored before forwarding instead of
 leaking generic request-shape failures.
+Invalid tool names or schemas should be treated as malformed Poe tool
+definitions and omitted locally before upstream forwarding.
 
 ## Dependency and Supply Chain Security
 
