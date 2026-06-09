@@ -207,6 +207,27 @@ test("repository check wrapper is documented and preserved", () => {
   assert.match(plan, /npm run verify/);
 });
 
+test("upstream Poe API key route guard is documented and preserved", () => {
+  const source = readProjectFile("poe-proxy.js");
+  const readme = readProjectFile("README.md");
+  const security = readProjectFile("SECURITY.md");
+  const vision = readProjectFile("VISION.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-upstream-api-key-route-guard.md"
+  );
+
+  assert.match(source, /validateUpstreamApiKey/);
+  assert.match(source, /POE_API_KEY is not configured/);
+  assert.match(readme, /upstream Poe key/);
+  assert.match(security, /POE_API_KEY/);
+  assert.match(vision, /server-side Poe key/);
+  assert.match(changes, /upstream Poe API key/);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /POE_API_KEY is not configured/);
+  assert.match(plan, /npm test/);
+});
+
 test("buildAnthropicResponse maps non-streaming Poe text responses", () => {
   const response = buildAnthropicResponse(
     {
@@ -389,6 +410,39 @@ test("createServer rejects unauthenticated requests before upstream fetch", asyn
 
     assert.equal(missing.statusCode, 401);
     assert.equal(invalid.statusCode, 403);
+    assert.equal(fetchCalled, false);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer rejects missing upstream Poe key before upstream fetch", async () => {
+  let fetchCalled = false;
+  const server = createServer({
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error("fetch should not be called");
+    },
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: {
+        authorization: "Bearer proxy-key",
+      },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+      },
+    });
+
+    assert.equal(response.statusCode, 503);
+    assert.deepEqual(response.json(), {
+      error: "POE_API_KEY is not configured",
+    });
     assert.equal(fetchCalled, false);
   } finally {
     await server.close();

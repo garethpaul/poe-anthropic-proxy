@@ -17,6 +17,7 @@ Priority:
 
 - Preserve the `/v1/messages` compatibility surface
 - Keep Poe API credentials in environment configuration behind inbound proxy auth
+- Reject requests locally when the server-side Poe key is missing
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 

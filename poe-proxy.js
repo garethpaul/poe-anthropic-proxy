@@ -92,6 +92,14 @@ function validateProxyAuthorization(headers, proxyApiKey) {
   return null;
 }
 
+function validateUpstreamApiKey(apiKey) {
+  if (!apiKey) {
+    return { statusCode: 503, error: "POE_API_KEY is not configured" };
+  }
+
+  return null;
+}
+
 function sendSSE(reply, event, data) {
   const sseMessage = `event: ${event}\n` + `data: ${JSON.stringify(data)}\n\n`;
   reply.raw.write(sseMessage);
@@ -340,6 +348,12 @@ export function createServer({
       if (authError) {
         reply.code(authError.statusCode);
         return { error: authError.error };
+      }
+
+      const upstreamKeyError = validateUpstreamApiKey(apiKey);
+      if (upstreamKeyError) {
+        reply.code(upstreamKeyError.statusCode);
+        return { error: upstreamKeyError.error };
       }
 
       const poePayload = buildPoePayload(request.body, defaultModel);

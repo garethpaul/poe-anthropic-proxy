@@ -56,6 +56,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - The server binds to `127.0.0.1` by default. Set `HOST` explicitly only when
   you have a separate access-control boundary.
 - Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
+- Requests are rejected before upstream forwarding if either the inbound proxy
+  token or upstream Poe key is missing.
 
 Detected npm scripts:
 
@@ -85,6 +87,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - Detected references to OpenAI. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
 - `POE_API_KEY` is the upstream Poe credential and must stay server-side.
 - `POE_PROXY_API_KEY` is the inbound caller token required by `/v1/messages`.
+- Programmatic `createServer()` usage must pass both values; the route returns
+  `503` rather than forwarding with a missing upstream Poe key.
 - `.env.example` documents placeholders for both credentials; replace them with
   private deployment values and do not commit real `.env` files.
 - `HOST` defaults to `127.0.0.1`; avoid `0.0.0.0` unless the proxy is behind
