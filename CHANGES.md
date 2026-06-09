@@ -4,6 +4,9 @@
 
 - Added stable `npm run lint`, `npm run build`, `make lint`, and `make build`
   aliases around the dependency-free syntax gate.
+- Added `scripts/check-baseline.sh` to protect package script wiring,
+  completed plan metadata, credential docs, and local metadata ignores from
+  `make check`.
 
 ## 2026-06-08
 

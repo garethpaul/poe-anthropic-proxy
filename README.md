@@ -80,6 +80,8 @@ Detected npm scripts:
 - `npm run start` - `node poe-proxy.js`
 - `npm run test` - `node --test`
 - `npm run verify` - `npm run lint && npm test && npm run build && npm run audit`
+- `scripts/check-baseline.sh` - repository baseline guard for package scripts,
+  completed plans, and local secret/editor metadata
 
 ## Testing and Verification
 
@@ -92,10 +94,13 @@ make check
 npm run lint
 npm run build
 npm run verify
+scripts/check-baseline.sh
 ```
 
 `make check` delegates to `npm run verify`, which runs syntax checks,
 deterministic Node tests, the build alias, and `npm audit --audit-level=moderate`.
+It then runs `scripts/check-baseline.sh` to verify package script wiring,
+completed plan metadata, credential documentation, and local metadata ignores.
 The tests do not require a live Poe API key or network access.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
@@ -139,6 +144,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   authorization baseline.
 - See `docs/plans/2026-06-09-poe-proxy-env-normalization.md` for environment
   normalization guardrails.
+- See `docs/plans/2026-06-09-scripted-baseline-check.md` for the scripted
+  repository baseline guard.
 
 ## Contributing
 

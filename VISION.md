@@ -21,6 +21,7 @@ Priority:
 - Normalize environment configuration so blank credentials are not accepted
 - Keep `npm run lint`, `npm run build`, `make lint`, and `make build` available
   as stable local gate aliases
+- Keep a scriptable baseline guard for package scripts and local metadata
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 - Keep malformed upstream response shapes covered by deterministic tests

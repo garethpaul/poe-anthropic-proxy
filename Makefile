@@ -18,3 +18,4 @@ verify:
 	$(NPM) run verify
 
 check: verify
+	scripts/check-baseline.sh
