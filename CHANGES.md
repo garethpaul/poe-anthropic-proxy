@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Added a root `make check` wrapper for the proxy verification gate.
 - Required inbound proxy authorization with `POE_PROXY_API_KEY` before
   forwarding requests with the server-side Poe API key.
 - Bound the local server to `127.0.0.1` by default unless `HOST` is explicitly

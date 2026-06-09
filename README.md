@@ -12,6 +12,7 @@ This README is based on the checked-in source, manifests, scripts, and repositor
 ## Repository Contents
 
 - `README.md` - project overview and local usage notes
+- `Makefile` - repository-level verification wrapper
 - `package.json` - JavaScript dependency and script metadata
 - `docs` - source or example code
 - `package-lock.json` - JavaScript dependency and script metadata
@@ -23,7 +24,7 @@ Additional scan context:
 
 - Source directories: docs, test
 - Dependency and build manifests: package-lock.json, package.json
-- Entry points or build surfaces: package.json
+- Entry points or build surfaces: package.json, Makefile
 - Test-looking files: docs/plans/2026-06-08-poe-anthropic-proxy-security-test-baseline.md, test/poe-proxy.test.js
 
 ## Getting Started
@@ -69,12 +70,13 @@ Detected npm scripts:
 Run the local verification gate before changing the proxy:
 
 ```bash
+make check
 npm run verify
 ```
 
-`npm run verify` runs deterministic Node tests and `npm audit
---audit-level=moderate`. The tests do not require a live Poe API key or network
-access.
+`make check` delegates to `npm run verify`, which runs deterministic Node tests
+and `npm audit --audit-level=moderate`. The tests do not require a live Poe API
+key or network access.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 

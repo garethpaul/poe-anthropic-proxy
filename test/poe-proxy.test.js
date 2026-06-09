@@ -192,6 +192,21 @@ test(".env.example documents required proxy credentials", () => {
   assert.match(example, /^POE_PROXY_API_KEY=your_private_proxy_token_here$/m);
 });
 
+test("repository check wrapper is documented and preserved", () => {
+  const makefile = readProjectFile("Makefile");
+  const readme = readProjectFile("README.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile("docs/plans/2026-06-08-poe-proxy-check-wrapper.md");
+
+  assert.match(makefile, /^check: verify$/m);
+  assert.match(makefile, /\$\(NPM\) run verify/);
+  assert.match(readme, /make check/);
+  assert.match(changes, /make check/);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /make check/);
+  assert.match(plan, /npm run verify/);
+});
+
 test("buildAnthropicResponse maps non-streaming Poe text responses", () => {
   const response = buildAnthropicResponse(
     {
