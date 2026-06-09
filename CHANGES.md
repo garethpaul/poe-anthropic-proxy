@@ -12,3 +12,5 @@
   sync with startup requirements.
 - Added a route-time upstream Poe API key guard so programmatic server usage
   fails locally before forwarding with an invalid bearer token.
+- Normalized environment configuration so padded values are trimmed and blank
+  credentials are treated as unset.

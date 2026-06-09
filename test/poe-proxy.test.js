@@ -175,6 +175,24 @@ test("loadConfig binds localhost by default and reads proxy auth", () => {
   assert.equal(loadConfig({ HOST: "0.0.0.0" }).host, "0.0.0.0");
 });
 
+test("loadConfig trims environment values and ignores blank credentials", () => {
+  const config = loadConfig({
+    POE_API_KEY: "  poe-key  ",
+    POE_PROXY_API_KEY: "   ",
+    HOST: " 127.0.0.1 ",
+    POE_BASE_URL: " ",
+    POE_MODEL: " Claude-Sonnet-4 ",
+    PORT: " ",
+  });
+
+  assert.equal(config.apiKey, "poe-key");
+  assert.equal(config.proxyApiKey, undefined);
+  assert.equal(config.host, "127.0.0.1");
+  assert.equal(config.baseUrl, "https://api.poe.com");
+  assert.equal(config.defaultModel, "Claude-Sonnet-4");
+  assert.equal(config.port, 3000);
+});
+
 test(".env.example documents required proxy credentials", () => {
   const example = readProjectFile(".env.example");
   for (const name of [

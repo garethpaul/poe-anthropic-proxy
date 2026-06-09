@@ -18,14 +18,24 @@ export function isDebugEnabled(value) {
   );
 }
 
+function configValue(value, fallback) {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
+}
+
+function optionalConfigValue(value) {
+  const normalized = String(value || "").trim();
+  return normalized || undefined;
+}
+
 export function loadConfig(env = process.env) {
   return {
-    baseUrl: env.POE_BASE_URL || DEFAULT_BASE_URL,
-    apiKey: env.POE_API_KEY,
-    proxyApiKey: env.POE_PROXY_API_KEY,
-    defaultModel: env.POE_MODEL || DEFAULT_MODEL,
-    host: env.HOST || DEFAULT_HOST,
-    port: env.PORT || DEFAULT_PORT,
+    baseUrl: configValue(env.POE_BASE_URL, DEFAULT_BASE_URL),
+    apiKey: optionalConfigValue(env.POE_API_KEY),
+    proxyApiKey: optionalConfigValue(env.POE_PROXY_API_KEY),
+    defaultModel: configValue(env.POE_MODEL, DEFAULT_MODEL),
+    host: configValue(env.HOST, DEFAULT_HOST),
+    port: configValue(env.PORT, DEFAULT_PORT),
     debug: isDebugEnabled(env.DEBUG),
   };
 }

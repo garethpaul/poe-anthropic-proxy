@@ -55,6 +55,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - Run `npm run dev` for the development server when that script is appropriate.
 - The server binds to `127.0.0.1` by default. Set `HOST` explicitly only when
   you have a separate access-control boundary.
+- Environment values are trimmed before use; blank credential values are treated
+  as unset rather than as valid tokens.
 - Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
 - Requests are rejected before upstream forwarding if either the inbound proxy
   token or upstream Poe key is missing.
@@ -93,6 +95,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   private deployment values and do not commit real `.env` files.
 - `HOST` defaults to `127.0.0.1`; avoid `0.0.0.0` unless the proxy is behind
   another authenticated boundary.
+- Whitespace-only `POE_API_KEY` or `POE_PROXY_API_KEY` values are treated as
+  missing credentials.
 
 ## Security and Privacy Notes
 
@@ -109,6 +113,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - See `CHANGES.md` for maintenance history.
 - See `docs/plans/2026-06-08-inbound-proxy-auth.md` for the inbound proxy
   authorization baseline.
+- See `docs/plans/2026-06-09-poe-proxy-env-normalization.md` for environment
+  normalization guardrails.
 
 ## Contributing
 

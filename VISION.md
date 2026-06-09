@@ -18,6 +18,7 @@ Priority:
 - Preserve the `/v1/messages` compatibility surface
 - Keep Poe API credentials in environment configuration behind inbound proxy auth
 - Reject requests locally when the server-side Poe key is missing
+- Normalize environment configuration so blank credentials are not accepted
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 
@@ -26,6 +27,7 @@ Next priorities:
 - Document unsupported Anthropic request fields
 - Add tests for malformed tool arguments and upstream error payloads
 - Keep model mapping configurable without hiding defaults
+- Keep environment normalization covered as deployment options evolve
 - Add live-verification notes that never print API keys
 
 Contribution rules:

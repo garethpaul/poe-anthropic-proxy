@@ -40,6 +40,8 @@ The `/v1/messages` route must have both `POE_PROXY_API_KEY` and `POE_API_KEY`
 configured before it forwards a request. Missing upstream Poe credentials should
 return a local `503` response instead of sending a request with an invalid bearer
 token.
+Whitespace-only credential environment values are treated as missing
+configuration.
 
 ## Dependency and Supply Chain Security
 
