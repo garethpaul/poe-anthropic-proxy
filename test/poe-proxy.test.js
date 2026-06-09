@@ -246,6 +246,26 @@ test("upstream Poe API key route guard is documented and preserved", () => {
   assert.match(plan, /npm test/);
 });
 
+test("environment value normalization is documented and preserved", () => {
+  const source = readProjectFile("poe-proxy.js");
+  const readme = readProjectFile("README.md");
+  const security = readProjectFile("SECURITY.md");
+  const vision = readProjectFile("VISION.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-env-normalization.md"
+  );
+
+  assert.match(source, /function configValue/);
+  assert.match(source, /\.trim\(\)/);
+  assert.match(readme, /blank/i);
+  assert.match(security, /blank/i);
+  assert.match(vision, /blank/i);
+  assert.match(changes, /blank/i);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /POE_PROXY_API_KEY/);
+});
+
 test("buildAnthropicResponse maps non-streaming Poe text responses", () => {
   const response = buildAnthropicResponse(
     {
