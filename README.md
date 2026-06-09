@@ -64,6 +64,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   error before response mapping continues.
 - Malformed Poe tool call arguments are rejected with an explicit local mapping
   error before Anthropic tool-use content is returned.
+- Malformed Poe tool definitions are ignored before forwarding so bad request
+  tool metadata does not crash payload conversion.
 
 Detected npm scripts:
 
@@ -105,6 +107,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   instead of leaking generic property-access failures.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
   of leaking generic JSON parse failures.
+- Malformed Poe tool definitions are ignored before forwarding instead of
+  leaking generic request-shape failures.
 
 ## Security and Privacy Notes
 

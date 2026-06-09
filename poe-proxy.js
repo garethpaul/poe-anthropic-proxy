@@ -257,8 +257,15 @@ export function removeUriFormat(schema) {
 }
 
 export function buildPoeTools(tools = []) {
+  if (!Array.isArray(tools)) return [];
+
   return tools
-    .filter((tool) => !["BatchTool"].includes(tool.name))
+    .filter(
+      (tool) =>
+        tool &&
+        typeof tool === "object" &&
+        !["BatchTool"].includes(tool.name)
+    )
     .map((tool) => ({
       type: "function",
       function: {

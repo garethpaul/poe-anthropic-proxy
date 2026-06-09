@@ -23,6 +23,7 @@ Priority:
 - Keep tool-call and streaming behavior covered by fixtures
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep malformed tool arguments covered by deterministic tests
+- Keep malformed tool definitions covered by deterministic tests
 
 Next priorities:
 

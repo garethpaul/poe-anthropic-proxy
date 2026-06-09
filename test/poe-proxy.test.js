@@ -140,6 +140,32 @@ test("buildPoePayload maps model, defaults, tools, and stream flags", () => {
   assert.equal(inputSchema.properties.url.format, "uri");
 });
 
+test("buildPoePayload ignores malformed tool definitions", () => {
+  const payload = buildPoePayload({
+    messages: [{ role: "user", content: "Hello" }],
+    tools: [
+      null,
+      "not-a-tool",
+      { name: "BatchTool", input_schema: { type: "object" } },
+      {
+        name: "lookup_weather",
+        description: "Lookup weather",
+        input_schema: { type: "object" },
+      },
+    ],
+  });
+
+  assert.equal(payload.tools.length, 1);
+  assert.equal(payload.tools[0].function.name, "lookup_weather");
+  assert.equal(
+    buildPoePayload({
+      messages: [{ role: "user", content: "Hello" }],
+      tools: { name: "lookup_weather" },
+    }).tools,
+    undefined
+  );
+});
+
 test("removeUriFormat handles nested schemas without mutating input", () => {
   const schema = {
     additionalProperties: { type: "string", format: "uri" },
@@ -394,6 +420,26 @@ test("malformed Poe tool call argument guard is documented and preserved", () =>
   assert.match(changes, /malformed Poe tool call arguments/);
   assert.match(plan, /status: completed/);
   assert.match(plan, /Poe tool call arguments must be valid JSON/);
+});
+
+test("malformed Poe tool definition guard is documented and preserved", () => {
+  const source = readProjectFile("poe-proxy.js");
+  const readme = readProjectFile("README.md");
+  const security = readProjectFile("SECURITY.md");
+  const vision = readProjectFile("VISION.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-tool-definition-shape.md"
+  );
+
+  assert.match(source, /if \(!Array\.isArray\(tools\)\) return \[\]/);
+  assert.match(source, /typeof tool === "object"/);
+  assert.match(readme, /malformed Poe tool definitions/i);
+  assert.match(security, /malformed Poe tool definitions/i);
+  assert.match(vision, /malformed tool definitions/);
+  assert.match(changes, /malformed Poe tool definitions/);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /buildPoeTools/);
 });
 
 test("buildAnthropicResponse maps tool calls and fallback usage", () => {

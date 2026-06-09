@@ -46,6 +46,8 @@ Malformed upstream Poe responses should fail with explicit local mapping errors
 instead of generic property-access failures.
 Malformed Poe tool call arguments should fail with explicit local mapping
 errors instead of generic JSON parse failures.
+Malformed Poe tool definitions should be ignored before forwarding instead of
+leaking generic request-shape failures.
 
 ## Dependency and Supply Chain Security
 
