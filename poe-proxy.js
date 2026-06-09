@@ -289,12 +289,19 @@ function estimateTokens(text) {
   return String(text).trim().split(/\s+/).filter(Boolean).length;
 }
 
+function firstPoeChoice(data) {
+  if (!Array.isArray(data?.choices) || !data.choices[0]?.message) {
+    throw new Error("Poe response missing choices[0].message");
+  }
+  return data.choices[0];
+}
+
 export function buildAnthropicResponse(data, poePayload) {
   if (data.error) {
     throw new Error(data.error.message);
   }
 
-  const choice = data.choices[0];
+  const choice = firstPoeChoice(data);
   const poeMessage = choice.message;
   const toolCalls = poeMessage.tool_calls || [];
   const textContent =

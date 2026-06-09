@@ -14,3 +14,5 @@
   fails locally before forwarding with an invalid bearer token.
 - Normalized environment configuration so padded values are trimmed and blank
   credentials are treated as unset.
+- Added an explicit guard for malformed non-streaming Poe responses that are
+  missing `choices[0].message`.

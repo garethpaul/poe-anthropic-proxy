@@ -42,6 +42,8 @@ return a local `503` response instead of sending a request with an invalid beare
 token.
 Blank or whitespace-only credential environment values are treated as missing
 configuration.
+Malformed upstream Poe responses should fail with explicit local mapping errors
+instead of generic property-access failures.
 
 ## Dependency and Supply Chain Security
 

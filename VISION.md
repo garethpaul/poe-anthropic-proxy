@@ -21,6 +21,7 @@ Priority:
 - Normalize environment configuration so blank credentials are not accepted
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
+- Keep malformed upstream response shapes covered by deterministic tests
 
 Next priorities:
 

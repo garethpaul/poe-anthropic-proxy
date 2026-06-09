@@ -305,6 +305,43 @@ test("buildAnthropicResponse maps non-streaming Poe text responses", () => {
   });
 });
 
+test("buildAnthropicResponse rejects malformed non-streaming Poe responses", () => {
+  assert.throws(
+    () =>
+      buildAnthropicResponse(
+        {
+          id: "chatcmpl_empty",
+          choices: [],
+        },
+        {
+          model: "Claude-Sonnet-4",
+          messages: [{ role: "user", content: "Hello" }],
+        }
+      ),
+    /Poe response missing choices\[0\]\.message/
+  );
+});
+
+test("malformed upstream Poe response guard is documented and preserved", () => {
+  const source = readProjectFile("poe-proxy.js");
+  const readme = readProjectFile("README.md");
+  const security = readProjectFile("SECURITY.md");
+  const vision = readProjectFile("VISION.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-upstream-response-shape.md"
+  );
+
+  assert.match(source, /function firstPoeChoice/);
+  assert.match(source, /Poe response missing choices\[0\]\.message/);
+  assert.match(readme, /malformed non-streaming upstream responses/i);
+  assert.match(security, /malformed upstream Poe responses/i);
+  assert.match(vision, /malformed upstream response shapes/);
+  assert.match(changes, /malformed non-streaming Poe responses/);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /Poe response missing choices\[0\]\.message/);
+});
+
 test("buildAnthropicResponse maps tool calls and fallback usage", () => {
   const response = buildAnthropicResponse(
     {

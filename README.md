@@ -60,6 +60,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
 - Requests are rejected before upstream forwarding if either the inbound proxy
   token or upstream Poe key is missing.
+- Malformed non-streaming upstream responses are rejected with an explicit local
+  error before response mapping continues.
 
 Detected npm scripts:
 
@@ -97,6 +99,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   another authenticated boundary.
 - Whitespace-only `POE_API_KEY` or `POE_PROXY_API_KEY` values are treated as
   missing credentials.
+- Malformed non-streaming upstream responses are treated as local mapping errors
+  instead of leaking generic property-access failures.
 
 ## Security and Privacy Notes
 
