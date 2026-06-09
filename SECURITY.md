@@ -44,6 +44,8 @@ Blank or whitespace-only credential environment values are treated as missing
 configuration.
 Malformed upstream Poe responses should fail with explicit local mapping errors
 instead of generic property-access failures.
+Malformed Poe tool call arguments should fail with explicit local mapping
+errors instead of generic JSON parse failures.
 
 ## Dependency and Supply Chain Security
 

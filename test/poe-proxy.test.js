@@ -322,6 +322,40 @@ test("buildAnthropicResponse rejects malformed non-streaming Poe responses", () 
   );
 });
 
+test("buildAnthropicResponse rejects malformed Poe tool call arguments", () => {
+  assert.throws(
+    () =>
+      buildAnthropicResponse(
+        {
+          id: "chatcmpl_bad_tool",
+          choices: [
+            {
+              finish_reason: "tool_calls",
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_1",
+                    function: {
+                      name: "lookup_weather",
+                      arguments: "{not-json",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          model: "Claude-Sonnet-4",
+          messages: [{ role: "user", content: "Hello" }],
+        }
+      ),
+    /Poe tool call arguments must be valid JSON/
+  );
+});
+
 test("malformed upstream Poe response guard is documented and preserved", () => {
   const source = readProjectFile("poe-proxy.js");
   const readme = readProjectFile("README.md");
@@ -340,6 +374,26 @@ test("malformed upstream Poe response guard is documented and preserved", () => 
   assert.match(changes, /malformed non-streaming Poe responses/);
   assert.match(plan, /status: completed/);
   assert.match(plan, /Poe response missing choices\[0\]\.message/);
+});
+
+test("malformed Poe tool call argument guard is documented and preserved", () => {
+  const source = readProjectFile("poe-proxy.js");
+  const readme = readProjectFile("README.md");
+  const security = readProjectFile("SECURITY.md");
+  const vision = readProjectFile("VISION.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-tool-call-arguments.md"
+  );
+
+  assert.match(source, /function parseToolCallInput/);
+  assert.match(source, /Poe tool call arguments must be valid JSON/);
+  assert.match(readme, /malformed Poe tool call arguments/i);
+  assert.match(security, /malformed Poe tool call arguments/i);
+  assert.match(vision, /malformed tool arguments/);
+  assert.match(changes, /malformed Poe tool call arguments/);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /Poe tool call arguments must be valid JSON/);
 });
 
 test("buildAnthropicResponse maps tool calls and fallback usage", () => {

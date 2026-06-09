@@ -296,6 +296,14 @@ function firstPoeChoice(data) {
   return data.choices[0];
 }
 
+function parseToolCallInput(toolCall) {
+  try {
+    return JSON.parse(toolCall.function.arguments);
+  } catch {
+    throw new Error("Poe tool call arguments must be valid JSON");
+  }
+}
+
 export function buildAnthropicResponse(data, poePayload) {
   if (data.error) {
     throw new Error(data.error.message);
@@ -321,7 +329,7 @@ export function buildAnthropicResponse(data, poePayload) {
         type: "tool_use",
         id: toolCall.id,
         name: toolCall.function.name,
-        input: JSON.parse(toolCall.function.arguments),
+        input: parseToolCallInput(toolCall),
       })),
     ],
     id: data.id

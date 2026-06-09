@@ -16,3 +16,4 @@
   credentials are treated as unset.
 - Added an explicit guard for malformed non-streaming Poe responses that are
   missing `choices[0].message`.
+- Added an explicit guard for malformed Poe tool call arguments.

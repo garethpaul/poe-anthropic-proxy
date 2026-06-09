@@ -22,11 +22,12 @@ Priority:
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 - Keep malformed upstream response shapes covered by deterministic tests
+- Keep malformed tool arguments covered by deterministic tests
 
 Next priorities:
 
 - Document unsupported Anthropic request fields
-- Add tests for malformed tool arguments and upstream error payloads
+- Add tests for upstream error payloads
 - Keep model mapping configurable without hiding defaults
 - Keep environment normalization covered as deployment options evolve
 - Add live-verification notes that never print API keys

@@ -62,6 +62,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   token or upstream Poe key is missing.
 - Malformed non-streaming upstream responses are rejected with an explicit local
   error before response mapping continues.
+- Malformed Poe tool call arguments are rejected with an explicit local mapping
+  error before Anthropic tool-use content is returned.
 
 Detected npm scripts:
 
@@ -101,6 +103,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   missing credentials.
 - Malformed non-streaming upstream responses are treated as local mapping errors
   instead of leaking generic property-access failures.
+- Malformed Poe tool call arguments are treated as local mapping errors instead
+  of leaking generic JSON parse failures.
 
 ## Security and Privacy Notes
 
