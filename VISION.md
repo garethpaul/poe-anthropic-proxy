@@ -19,6 +19,8 @@ Priority:
 - Keep Poe API credentials in environment configuration behind inbound proxy auth
 - Reject requests locally when the server-side Poe key is missing
 - Normalize environment configuration so blank credentials are not accepted
+- Keep `npm run lint`, `npm run build`, `make lint`, and `make build` available
+  as stable local gate aliases
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 - Keep malformed upstream response shapes covered by deterministic tests

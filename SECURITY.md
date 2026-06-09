@@ -42,6 +42,8 @@ return a local `503` response instead of sending a request with an invalid beare
 token.
 Blank or whitespace-only credential environment values are treated as missing
 configuration.
+Run `npm run lint`, `npm run build`, `make lint`, and `make build` before
+changing route handling, payload translation, or credential checks.
 Malformed upstream Poe responses should fail with explicit local mapping errors
 instead of generic property-access failures.
 Malformed Poe tool call arguments should fail with explicit local mapping

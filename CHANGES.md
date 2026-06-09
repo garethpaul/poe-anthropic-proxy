@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-09
+
+- Added stable `npm run lint`, `npm run build`, `make lint`, and `make build`
+  aliases around the dependency-free syntax gate.
+
 ## 2026-06-08
 
 - Added a root `make check` wrapper for the proxy verification gate.

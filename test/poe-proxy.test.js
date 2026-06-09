@@ -237,18 +237,37 @@ test(".env.example documents required proxy credentials", () => {
 });
 
 test("repository check wrapper is documented and preserved", () => {
+  const pkg = JSON.parse(readProjectFile("package.json"));
   const makefile = readProjectFile("Makefile");
   const readme = readProjectFile("README.md");
   const changes = readProjectFile("CHANGES.md");
   const plan = readProjectFile("docs/plans/2026-06-08-poe-proxy-check-wrapper.md");
+  const aliasPlan = readProjectFile(
+    "docs/plans/2026-06-09-poe-proxy-gate-aliases.md"
+  );
 
+  assert.equal(pkg.scripts.lint, "node --check poe-proxy.js");
+  assert.equal(pkg.scripts.build, "node --check poe-proxy.js");
+  assert.equal(
+    pkg.scripts.verify,
+    "npm run lint && npm test && npm run build && npm run audit"
+  );
+  assert.match(makefile, /^lint:\n\t\$\((?:NPM)\) run lint$/m);
+  assert.match(makefile, /^build:\n\t\$\((?:NPM)\) run build$/m);
   assert.match(makefile, /^check: verify$/m);
   assert.match(makefile, /\$\(NPM\) run verify/);
+  assert.match(readme, /make lint/);
+  assert.match(readme, /make build/);
+  assert.match(readme, /npm run lint/);
+  assert.match(readme, /npm run build/);
   assert.match(readme, /make check/);
   assert.match(changes, /make check/);
   assert.match(plan, /status: completed/);
   assert.match(plan, /make check/);
   assert.match(plan, /npm run verify/);
+  assert.match(aliasPlan, /status: completed/);
+  assert.match(aliasPlan, /make lint/);
+  assert.match(aliasPlan, /npm run build/);
 });
 
 test("upstream Poe API key route guard is documented and preserved", () => {

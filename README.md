@@ -60,6 +60,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
 - Requests are rejected before upstream forwarding if either the inbound proxy
   token or upstream Poe key is missing.
+- Use `npm run lint`, `npm run build`, `make lint`, and `make build` as stable
+  local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local
   error before response mapping continues.
 - Malformed Poe tool call arguments are rejected with an explicit local mapping
@@ -70,23 +72,29 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 Detected npm scripts:
 
 - `npm run audit` - `npm audit --audit-level=moderate`
+- `npm run build` - `node --check poe-proxy.js`
 - `npm run dev` - `node --watch poe-proxy.js`
+- `npm run lint` - `node --check poe-proxy.js`
 - `npm run start` - `node poe-proxy.js`
 - `npm run test` - `node --test`
-- `npm run verify` - `npm test && npm run audit`
+- `npm run verify` - `npm run lint && npm test && npm run build && npm run audit`
 
 ## Testing and Verification
 
 Run the local verification gate before changing the proxy:
 
 ```bash
+make lint
+make build
 make check
+npm run lint
+npm run build
 npm run verify
 ```
 
-`make check` delegates to `npm run verify`, which runs deterministic Node tests
-and `npm audit --audit-level=moderate`. The tests do not require a live Poe API
-key or network access.
+`make check` delegates to `npm run verify`, which runs syntax checks,
+deterministic Node tests, the build alias, and `npm audit --audit-level=moderate`.
+The tests do not require a live Poe API key or network access.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 

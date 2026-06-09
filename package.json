@@ -7,9 +7,11 @@
   "scripts": {
     "start": "node poe-proxy.js",
     "dev": "node --watch poe-proxy.js",
+    "lint": "node --check poe-proxy.js",
     "test": "node --test",
+    "build": "node --check poe-proxy.js",
     "audit": "npm audit --audit-level=moderate",
-    "verify": "npm test && npm run audit"
+    "verify": "npm run lint && npm test && npm run build && npm run audit"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
