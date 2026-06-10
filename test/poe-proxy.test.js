@@ -18,6 +18,16 @@ function readProjectFile(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 }
 
+async function withMutedConsoleError(callback) {
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    return await callback();
+  } finally {
+    console.error = originalError;
+  }
+}
+
 test("buildPoeMessages converts Anthropic messages to Poe chat messages", () => {
   const messages = buildPoeMessages({
     system: [{ text: "Be concise." }, { content: [{ text: "Use tools." }] }],
@@ -478,6 +488,26 @@ test("malformed Poe tool definition guard is documented and preserved", () => {
   assert.match(nameSchemaPlan, /npm test/);
 });
 
+test("upstream Poe error payload handling is documented and preserved", () => {
+  const source = readProjectFile("poe-proxy.js");
+  const readme = readProjectFile("README.md");
+  const security = readProjectFile("SECURITY.md");
+  const vision = readProjectFile("VISION.md");
+  const changes = readProjectFile("CHANGES.md");
+  const plan = readProjectFile(
+    "docs/plans/2026-06-10-poe-proxy-upstream-error-payloads.md"
+  );
+
+  assert.match(source, /function readUpstreamErrorDetails/);
+  assert.match(source, /Poe upstream request failed/);
+  assert.match(readme, /upstream Poe error payloads/i);
+  assert.match(security, /upstream Poe error payloads/i);
+  assert.match(vision, /upstream error payloads/);
+  assert.match(changes, /upstream Poe error payloads/);
+  assert.match(plan, /status: completed/);
+  assert.match(plan, /Poe upstream request failed/);
+});
+
 test("buildAnthropicResponse maps tool calls and fallback usage", () => {
   const response = buildAnthropicResponse(
     {
@@ -583,6 +613,88 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     assert.deepEqual(response.json().content, [
       { text: "Hello from Poe", type: "text" },
     ]);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer returns upstream Poe error payloads with upstream status", async () => {
+  let jsonCalled = false;
+  const upstreamError = JSON.stringify({ error: { message: "rate limited" } });
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    baseUrl: "https://example.test",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: false,
+      status: 429,
+      statusText: "Too Many Requests",
+      async text() {
+        return upstreamError;
+      },
+      async json() {
+        jsonCalled = true;
+        throw new Error("json should not be called");
+      },
+    }),
+  });
+
+  try {
+    const response = await withMutedConsoleError(() =>
+      server.inject({
+        method: "POST",
+        url: "/v1/messages",
+        headers: {
+          authorization: "Bearer proxy-key",
+        },
+        payload: {
+          messages: [{ role: "user", content: "Hello" }],
+        },
+      })
+    );
+
+    assert.equal(response.statusCode, 429);
+    assert.deepEqual(response.json(), { error: upstreamError });
+    assert.equal(jsonCalled, false);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer returns a useful fallback for empty upstream Poe errors", async () => {
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      async text() {
+        return "";
+      },
+    }),
+  });
+
+  try {
+    const response = await withMutedConsoleError(() =>
+      server.inject({
+        method: "POST",
+        url: "/v1/messages",
+        headers: {
+          authorization: "Bearer proxy-key",
+        },
+        payload: {
+          messages: [{ role: "user", content: "Hello" }],
+        },
+      })
+    );
+
+    assert.equal(response.statusCode, 502);
+    assert.deepEqual(response.json(), {
+      error: "Poe upstream request failed with 502 Bad Gateway",
+    });
   } finally {
     await server.close();
   }

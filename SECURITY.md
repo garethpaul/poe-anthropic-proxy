@@ -46,6 +46,8 @@ Run `npm run lint`, `npm run build`, `make lint`, and `make build` before
 changing route handling, payload translation, or credential checks.
 Malformed upstream Poe responses should fail with explicit local mapping errors
 instead of generic property-access failures.
+Upstream Poe error payloads should preserve the upstream status and use a local
+status fallback when Poe sends an empty error body.
 Malformed Poe tool call arguments should fail with explicit local mapping
 errors instead of generic JSON parse failures.
 Malformed Poe tool definitions should be ignored before forwarding instead of

@@ -111,6 +111,14 @@ function validateUpstreamApiKey(apiKey) {
   return null;
 }
 
+async function readUpstreamErrorDetails(response) {
+  const details = await response.text();
+  if (details) return details;
+
+  const statusText = response.statusText ? ` ${response.statusText}` : "";
+  return `Poe upstream request failed with ${response.status}${statusText}`;
+}
+
 function sendSSE(reply, event, data) {
   const sseMessage = `event: ${event}\n` + `data: ${JSON.stringify(data)}\n\n`;
   reply.raw.write(sseMessage);
@@ -413,7 +421,7 @@ export function createServer({
       });
 
       if (!poeResponse.ok) {
-        const errorDetails = await poeResponse.text();
+        const errorDetails = await readUpstreamErrorDetails(poeResponse);
         console.error(
           `Poe API Error: ${poeResponse.status} ${poeResponse.statusText}`
         );

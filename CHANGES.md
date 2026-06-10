@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-10
+
+- Added deterministic route coverage for upstream Poe error payloads and empty
+  upstream error-body fallbacks.
+
 ## 2026-06-09
 
 - Added stable `npm run lint`, `npm run build`, `make lint`, and `make build`

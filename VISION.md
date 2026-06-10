@@ -25,6 +25,7 @@ Priority:
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
 - Keep malformed upstream response shapes covered by deterministic tests
+- Keep upstream error payloads covered by deterministic route tests
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests
 - Keep Poe tool names and schemas validated before upstream forwarding
@@ -32,7 +33,6 @@ Priority:
 Next priorities:
 
 - Document unsupported Anthropic request fields
-- Add tests for upstream error payloads
 - Keep model mapping configurable without hiding defaults
 - Keep environment normalization covered as deployment options evolve
 - Add live-verification notes that never print API keys

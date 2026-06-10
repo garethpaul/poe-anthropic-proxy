@@ -64,6 +64,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local
   error before response mapping continues.
+- Upstream Poe error payloads keep the upstream status code and return a local
+  status fallback when Poe sends an empty error body.
 - Malformed Poe tool call arguments are rejected with an explicit local mapping
   error before Anthropic tool-use content is returned.
 - Malformed Poe tool definitions are ignored before forwarding so bad request
@@ -120,6 +122,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   missing credentials.
 - Malformed non-streaming upstream responses are treated as local mapping errors
   instead of leaking generic property-access failures.
+- Upstream Poe error payloads are returned without attempting success-response
+  mapping, and empty error bodies get a status-based fallback message.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
   of leaking generic JSON parse failures.
 - Malformed Poe tool definitions are ignored before forwarding instead of
@@ -144,6 +148,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   authorization baseline.
 - See `docs/plans/2026-06-09-poe-proxy-env-normalization.md` for environment
   normalization guardrails.
+- See `docs/plans/2026-06-10-poe-proxy-upstream-error-payloads.md` for
+  upstream Poe error payload handling.
 - See `docs/plans/2026-06-09-scripted-baseline-check.md` for the scripted
   repository baseline guard.
 
