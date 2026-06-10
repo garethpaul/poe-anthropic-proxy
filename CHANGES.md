@@ -7,6 +7,8 @@
 
 - Added deterministic route coverage for upstream Poe error payloads and empty
   upstream error-body fallbacks.
+- Added a configurable 30-second Poe upstream request timeout with stable `504`
+  handling.
 
 ## 2026-06-09
 

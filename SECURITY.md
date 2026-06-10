@@ -54,6 +54,10 @@ Malformed Poe tool definitions should be ignored before forwarding instead of
 leaking generic request-shape failures.
 Invalid tool names or schemas should be treated as malformed Poe tool
 definitions and omitted locally before upstream forwarding.
+Every Poe request should use a bounded upstream request timeout so stalled
+connections cannot retain proxy resources indefinitely.
+Timeout responses and logs should use stable text rather than raw runtime error
+details.
 
 ## Dependency and Supply Chain Security
 

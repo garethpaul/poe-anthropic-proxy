@@ -212,7 +212,12 @@ test("loadConfig binds localhost by default and reads proxy auth", () => {
 
   assert.equal(config.host, "127.0.0.1");
   assert.equal(config.proxyApiKey, "proxy-key");
+  assert.equal(config.upstreamTimeoutMs, 30000);
   assert.equal(loadConfig({ HOST: "0.0.0.0" }).host, "0.0.0.0");
+  assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: " 5000 " }).upstreamTimeoutMs, 5000);
+  assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: "invalid" }).upstreamTimeoutMs, 30000);
+  assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: "0" }).upstreamTimeoutMs, 30000);
+  assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: "300001" }).upstreamTimeoutMs, 30000);
 });
 
 test("loadConfig trims environment values and ignores blank credentials", () => {
@@ -240,6 +245,7 @@ test(".env.example documents required proxy credentials", () => {
     "POE_PROXY_API_KEY",
     "POE_BASE_URL",
     "POE_MODEL",
+    "POE_UPSTREAM_TIMEOUT_MS",
     "HOST",
     "PORT",
   ]) {
@@ -603,6 +609,7 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     assert.equal(response.statusCode, 200);
     assert.equal(capturedRequest.url, "https://example.test/v1/chat/completions");
     assert.equal(capturedRequest.options.headers.Authorization, "Bearer test-key");
+    assert.ok(capturedRequest.options.signal instanceof AbortSignal);
     assert.deepEqual(JSON.parse(capturedRequest.options.body), {
       model: "Claude-Sonnet-4",
       messages: [{ role: "user", content: "Hello" }],
@@ -614,6 +621,49 @@ test("createServer handles non-streaming requests with injected fetch", async ()
       { text: "Hello from Poe", type: "text" },
     ]);
   } finally {
+    await server.close();
+  }
+});
+
+test("createServer returns a stable gateway timeout for stalled Poe requests", async () => {
+  let capturedSignal;
+  const loggedErrors = [];
+  const originalConsoleError = console.error;
+  const timeoutError = new Error("private upstream timeout detail");
+  timeoutError.name = "TimeoutError";
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    upstreamTimeoutMs: 5000,
+    fetchImpl: async (url, options) => {
+      capturedSignal = options.signal;
+      throw timeoutError;
+    },
+  });
+
+  try {
+    console.error = (...args) => loggedErrors.push(args.join(" "));
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: {
+        authorization: "Bearer proxy-key",
+      },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+      },
+    });
+
+    assert.ok(capturedSignal instanceof AbortSignal);
+    assert.equal(response.statusCode, 504);
+    assert.deepEqual(response.json(), {
+      error: "Poe upstream request timed out",
+    });
+    assert.doesNotMatch(response.body, /private upstream timeout detail/);
+    assert.deepEqual(loggedErrors, ["Poe upstream request timed out"]);
+  } finally {
+    console.error = originalConsoleError;
     await server.close();
   }
 });

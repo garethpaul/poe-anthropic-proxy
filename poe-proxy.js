@@ -9,6 +9,8 @@ const DEFAULT_BASE_URL = "https://api.poe.com";
 const DEFAULT_MODEL = "GPT-4.1";
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+const MAX_UPSTREAM_TIMEOUT_MS = 300_000;
 const POE_TOOL_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function isDebugEnabled(value) {
@@ -29,6 +31,17 @@ function optionalConfigValue(value) {
   return normalized || undefined;
 }
 
+function upstreamTimeoutConfig(value) {
+  const normalized = String(value || "").trim();
+  if (!/^\d+$/.test(normalized)) return DEFAULT_UPSTREAM_TIMEOUT_MS;
+  const parsed = Number(normalized);
+  return Number.isSafeInteger(parsed) &&
+    parsed > 0 &&
+    parsed <= MAX_UPSTREAM_TIMEOUT_MS
+    ? parsed
+    : DEFAULT_UPSTREAM_TIMEOUT_MS;
+}
+
 export function loadConfig(env = process.env) {
   return {
     baseUrl: configValue(env.POE_BASE_URL, DEFAULT_BASE_URL),
@@ -37,6 +50,7 @@ export function loadConfig(env = process.env) {
     defaultModel: configValue(env.POE_MODEL, DEFAULT_MODEL),
     host: configValue(env.HOST, DEFAULT_HOST),
     port: configValue(env.PORT, DEFAULT_PORT),
+    upstreamTimeoutMs: upstreamTimeoutConfig(env.POE_UPSTREAM_TIMEOUT_MS),
     debug: isDebugEnabled(env.DEBUG),
   };
 }
@@ -109,6 +123,10 @@ function validateUpstreamApiKey(apiKey) {
   }
 
   return null;
+}
+
+function isUpstreamTimeoutError(error) {
+  return error?.name === "TimeoutError" || error?.name === "AbortError";
 }
 
 async function readUpstreamErrorDetails(response) {
@@ -385,12 +403,14 @@ export function createServer({
   proxyApiKey,
   defaultModel = DEFAULT_MODEL,
   fetchImpl = fetch,
+  upstreamTimeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS,
   debug = false,
   logger = true,
 } = {}) {
   const fastify = Fastify({
     logger,
   });
+  const requestTimeoutMs = upstreamTimeoutConfig(upstreamTimeoutMs);
 
   fastify.post("/v1/messages", async (request, reply) => {
     try {
@@ -418,6 +438,7 @@ export function createServer({
         method: "POST",
         headers,
         body: JSON.stringify(poePayload),
+        signal: AbortSignal.timeout(requestTimeoutMs),
       });
 
       if (!poeResponse.ok) {
@@ -622,6 +643,15 @@ export function createServer({
 
       reply.raw.end();
     } catch (err) {
+      if (isUpstreamTimeoutError(err)) {
+        console.error("Poe upstream request timed out");
+        if (reply.raw.headersSent) {
+          reply.raw.end();
+          return;
+        }
+        reply.code(504);
+        return { error: "Poe upstream request timed out" };
+      }
       console.error(err);
       reply.code(500);
       return { error: err.message };

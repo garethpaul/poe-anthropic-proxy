@@ -32,6 +32,7 @@ for path in \
   "docs/plans/2026-06-08-poe-proxy-check-wrapper.md" \
   "docs/plans/2026-06-09-scripted-baseline-check.md" \
   "docs/plans/2026-06-10-hosted-proxy-validation.md" \
+  "docs/plans/2026-06-10-poe-proxy-upstream-timeout.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
 done
@@ -77,7 +78,7 @@ for package_script in \
   fi
 done
 
-for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux"; do
+for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "upstream request timeout" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux"; do
   if ! grep -Fq "$documented" "$README"; then
     printf '%s\n' "README must document $documented." >&2
     exit 1

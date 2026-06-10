@@ -29,6 +29,7 @@ Priority:
 - Keep tool-call and streaming behavior covered by fixtures
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep upstream error payloads covered by deterministic route tests
+- Keep the upstream request timeout configurable and covered by route tests
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests
 - Keep Poe tool names and schemas validated before upstream forwarding

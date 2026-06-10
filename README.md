@@ -45,7 +45,8 @@ export POE_PROXY_API_KEY=...
 ```
 
 `.env.example` lists the required upstream Poe key, inbound proxy key, and
-localhost binding defaults.
+localhost binding defaults. `POE_UPSTREAM_TIMEOUT_MS` configures the upstream
+request timeout, accepts 1-300000 milliseconds, and defaults to 30000.
 
 The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
 
@@ -60,6 +61,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
 - Requests are rejected before upstream forwarding if either the inbound proxy
   token or upstream Poe key is missing.
+- Every Poe fetch has a bounded upstream request timeout; pre-stream timeouts
+  return a stable `504` response.
 - Use `npm run lint`, `npm run build`, `make lint`, and `make build` as stable
   local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local
@@ -123,6 +126,7 @@ When the required SDK or runtime is unavailable, use static checks and source re
   another authenticated boundary.
 - Whitespace-only `POE_API_KEY` or `POE_PROXY_API_KEY` values are treated as
   missing credentials.
+- Invalid `POE_UPSTREAM_TIMEOUT_MS` values fall back to the 30-second default.
 - Malformed non-streaming upstream responses are treated as local mapping errors
   instead of leaking generic property-access failures.
 - Upstream Poe error payloads are returned without attempting success-response
