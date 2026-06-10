@@ -17,6 +17,7 @@ require_file() {
 }
 
 for path in \
+  ".github/workflows/check.yml" \
   ".env.example" \
   ".gitignore" \
   "CHANGES.md" \
@@ -30,8 +31,26 @@ for path in \
   "test/poe-proxy.test.js" \
   "docs/plans/2026-06-08-poe-proxy-check-wrapper.md" \
   "docs/plans/2026-06-09-scripted-baseline-check.md" \
+  "docs/plans/2026-06-10-hosted-proxy-validation.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
+done
+
+for workflow_value in \
+  "permissions:" \
+  "contents: read" \
+  "cancel-in-progress: true" \
+  "runs-on: ubuntu-24.04" \
+  "timeout-minutes: 10" \
+  "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10" \
+  "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e" \
+  "node-version: [20, 24]" \
+  "run: npm ci" \
+  "run: make check"; do
+  if ! grep -Fq "$workflow_value" "$ROOT_DIR/.github/workflows/check.yml"; then
+    printf '%s\n' "GitHub Actions workflow must include: $workflow_value" >&2
+    exit 1
+  fi
 done
 
 if ! grep -Fq "scripts/check-baseline.sh" "$MAKEFILE"; then
@@ -58,7 +77,7 @@ for package_script in \
   fi
 done
 
-for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "make check" "npm run verify" "scripts/check-baseline.sh"; do
+for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux"; do
   if ! grep -Fq "$documented" "$README"; then
     printf '%s\n' "README must document $documented." >&2
     exit 1
@@ -100,7 +119,8 @@ fi
 
 for plan in \
   "$DOCS_PLANS/2026-06-08-poe-proxy-check-wrapper.md" \
-  "$DOCS_PLANS/2026-06-09-scripted-baseline-check.md"; do
+  "$DOCS_PLANS/2026-06-09-scripted-baseline-check.md" \
+  "$DOCS_PLANS/2026-06-10-hosted-proxy-validation.md"; do
   if ! grep -Fq "make check" "$plan"; then
     printf '%s\n' "$plan must document make check verification." >&2
     exit 1

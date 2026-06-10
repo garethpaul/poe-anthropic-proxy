@@ -15,6 +15,9 @@ The current focus is:
 
 Priority:
 
+- Keep the authenticated proxy and dependency audit baseline running on pinned
+  hosted Linux with Node 20 and Node 24
+
 - Preserve the `/v1/messages` compatibility surface
 - Keep Poe API credentials in environment configuration behind inbound proxy auth
 - Reject requests locally when the server-side Poe key is missing

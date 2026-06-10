@@ -87,6 +87,9 @@ Detected npm scripts:
 
 ## Testing and Verification
 
+Pinned hosted Linux validation runs `npm ci` and the full `make check` gate on
+Node 20 and Node 24 without proxy credentials or live Poe requests.
+
 Run the local verification gate before changing the proxy:
 
 ```bash

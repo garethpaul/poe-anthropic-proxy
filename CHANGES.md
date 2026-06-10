@@ -2,6 +2,9 @@
 
 ## 2026-06-10
 
+- Added pinned, read-only hosted Linux validation on Node 20 and Node 24 using
+  lockfile installation and the full proxy security gate.
+
 - Added deterministic route coverage for upstream Poe error payloads and empty
   upstream error-body fallbacks.
 
