@@ -57,8 +57,20 @@ definitions and omitted locally before upstream forwarding.
 GitHub Actions runs the same no-live-credentials `make check` gate as local
 development. Do not add live Poe calls, deployment, or credentialed smoke tests
 to that workflow without a separate security review.
+Every Poe request should use a bounded upstream request timeout so stalled
+connections cannot retain proxy resources indefinitely.
+Timeout responses and logs should use stable text rather than raw runtime error
+details.
+Poe stream chunk boundaries must be buffered before JSON parsing so ordinary
+network segmentation cannot silently remove translated response content.
 
 ## Dependency and Supply Chain Security
+
+Pinned, read-only hosted Linux validation installs the lockfile exactly, runs
+the test suite and moderate-level audit, and does not receive proxy or upstream
+API credentials.
+Checkout credentials are not persisted, and `POE_BASE_URL` points to an invalid
+domain so an accidental live request cannot reach Poe during hosted validation.
 
 Dependency updates should come from trusted package managers and should keep lockfiles in sync when lockfiles exist. Do not commit credentials, private keys, tokens, generated secrets, or machine-local configuration. If a vulnerability depends on a compromised package, typosquatting risk, insecure transitive dependency, or unsafe build step, include the package name, affected version, and the path through which it is used.
 

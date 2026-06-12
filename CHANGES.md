@@ -1,11 +1,21 @@
 # Changes
 
+## 2026-06-12
+
+- Buffered partial Poe SSE records across stream chunk boundaries before JSON
+  parsing, including split UTF-8 characters and final unterminated lines.
+- Added direct decoder and injected-route regressions proving streamed content
+  survives arbitrary upstream byte segmentation.
+
 ## 2026-06-10
 
-- Added a GitHub Actions workflow that installs dependencies on Node 24 and
-  runs the local `make check` gate without live Poe credentials.
+- Added pinned, read-only hosted Linux validation on Node 20 and Node 24 using
+- Disabled persisted checkout credentials and forced hosted validation to use
+  an invalid upstream URL with blank Poe credentials.
 - Added deterministic route coverage for upstream Poe error payloads and empty
   upstream error-body fallbacks.
+- Added a configurable 30-second Poe upstream request timeout with stable `504`
+  handling.
 
 ## 2026-06-09
 

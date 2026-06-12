@@ -45,7 +45,8 @@ export POE_PROXY_API_KEY=...
 ```
 
 `.env.example` lists the required upstream Poe key, inbound proxy key, and
-localhost binding defaults.
+localhost binding defaults. `POE_UPSTREAM_TIMEOUT_MS` configures the upstream
+request timeout, accepts 1-300000 milliseconds, and defaults to 30000.
 
 The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
 
@@ -60,6 +61,10 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - Call `/v1/messages` with `Authorization: Bearer $POE_PROXY_API_KEY`.
 - Requests are rejected before upstream forwarding if either the inbound proxy
   token or upstream Poe key is missing.
+- Every Poe fetch has a bounded upstream request timeout; pre-stream timeouts
+  return a stable `504` response.
+- Streaming translation buffers partial SSE lines and UTF-8 bytes across stream
+  chunk boundaries so network segmentation cannot drop response content.
 - Use `npm run lint`, `npm run build`, `make lint`, and `make build` as stable
   local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local
@@ -87,6 +92,9 @@ Detected npm scripts:
 
 ## Testing and Verification
 
+Pinned hosted Linux validation runs `npm ci` and the full `make check` gate on
+Node 20 and Node 24 without proxy credentials or live Poe requests.
+
 Run the local verification gate before changing the proxy:
 
 ```bash
@@ -104,8 +112,10 @@ deterministic Node tests, the build alias, and `npm audit --audit-level=moderate
 It then runs `scripts/check-baseline.sh` to verify package script wiring,
 completed plan metadata, credential documentation, and local metadata ignores.
 The tests do not require a live Poe API key or network access.
-GitHub Actions installs dependencies with `npm ci` on Node 24 and runs the same
-`make check` gate on pushes and pull requests without live Poe credentials.
+GitHub Actions installs dependencies with `npm ci` on Node 20 and Node 24 and
+runs the same `make check` gate without live Poe credentials. Checkout does not
+persist credentials, and the job uses an invalid upstream URL so accidental
+network calls cannot target Poe.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -122,10 +132,13 @@ When the required SDK or runtime is unavailable, use static checks and source re
   another authenticated boundary.
 - Whitespace-only `POE_API_KEY` or `POE_PROXY_API_KEY` values are treated as
   missing credentials.
+- Invalid `POE_UPSTREAM_TIMEOUT_MS` values fall back to the 30-second default.
 - Malformed non-streaming upstream responses are treated as local mapping errors
   instead of leaking generic property-access failures.
 - Upstream Poe error payloads are returned without attempting success-response
   mapping, and empty error bodies get a status-based fallback message.
+- Poe stream chunk boundaries are reconstructed before JSON parsing, including
+  split multibyte text and a final line without a trailing newline.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
   of leaking generic JSON parse failures.
 - Malformed Poe tool definitions are ignored before forwarding instead of
@@ -155,6 +168,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - See `docs/plans/2026-06-09-scripted-baseline-check.md` for the scripted
   repository baseline guard.
 - See `docs/plans/2026-06-10-ci-baseline.md` for the GitHub Actions baseline.
+- See `docs/plans/2026-06-12-credential-free-hosted-validation.md` for the
+  exact credential-free workflow contract.
 
 ## Contributing
 

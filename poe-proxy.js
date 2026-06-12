@@ -9,6 +9,8 @@ const DEFAULT_BASE_URL = "https://api.poe.com";
 const DEFAULT_MODEL = "GPT-4.1";
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+const MAX_UPSTREAM_TIMEOUT_MS = 300_000;
 const POE_TOOL_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function isDebugEnabled(value) {
@@ -29,6 +31,17 @@ function optionalConfigValue(value) {
   return normalized || undefined;
 }
 
+function upstreamTimeoutConfig(value) {
+  const normalized = String(value || "").trim();
+  if (!/^\d+$/.test(normalized)) return DEFAULT_UPSTREAM_TIMEOUT_MS;
+  const parsed = Number(normalized);
+  return Number.isSafeInteger(parsed) &&
+    parsed > 0 &&
+    parsed <= MAX_UPSTREAM_TIMEOUT_MS
+    ? parsed
+    : DEFAULT_UPSTREAM_TIMEOUT_MS;
+}
+
 export function loadConfig(env = process.env) {
   return {
     baseUrl: configValue(env.POE_BASE_URL, DEFAULT_BASE_URL),
@@ -37,6 +50,7 @@ export function loadConfig(env = process.env) {
     defaultModel: configValue(env.POE_MODEL, DEFAULT_MODEL),
     host: configValue(env.HOST, DEFAULT_HOST),
     port: configValue(env.PORT, DEFAULT_PORT),
+    upstreamTimeoutMs: upstreamTimeoutConfig(env.POE_UPSTREAM_TIMEOUT_MS),
     debug: isDebugEnabled(env.DEBUG),
   };
 }
@@ -111,6 +125,10 @@ function validateUpstreamApiKey(apiKey) {
   return null;
 }
 
+function isUpstreamTimeoutError(error) {
+  return error?.name === "TimeoutError" || error?.name === "AbortError";
+}
+
 async function readUpstreamErrorDetails(response) {
   const details = await response.text();
   if (details) return details;
@@ -125,6 +143,27 @@ function sendSSE(reply, event, data) {
   if (typeof reply.raw.flush === "function") {
     reply.raw.flush();
   }
+}
+
+export function createSseLineDecoder() {
+  const decoder = new TextDecoder("utf-8");
+  let pending = "";
+
+  return {
+    push(chunk) {
+      pending += decoder.decode(chunk, { stream: true });
+      const lines = pending.split("\n");
+      pending = lines.pop();
+      return lines;
+    },
+    finish() {
+      pending += decoder.decode();
+      if (!pending) return [];
+      const finalLine = pending;
+      pending = "";
+      return [finalLine];
+    },
+  };
 }
 
 export function mapStopReason(finishReason) {
@@ -385,12 +424,14 @@ export function createServer({
   proxyApiKey,
   defaultModel = DEFAULT_MODEL,
   fetchImpl = fetch,
+  upstreamTimeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS,
   debug = false,
   logger = true,
 } = {}) {
   const fastify = Fastify({
     logger,
   });
+  const requestTimeoutMs = upstreamTimeoutConfig(upstreamTimeoutMs);
 
   fastify.post("/v1/messages", async (request, reply) => {
     try {
@@ -418,6 +459,7 @@ export function createServer({
         method: "POST",
         headers,
         body: JSON.stringify(poePayload),
+        signal: AbortSignal.timeout(requestTimeoutMs),
       });
 
       if (!poeResponse.ok) {
@@ -474,154 +516,167 @@ export function createServer({
       let textBlockStarted = false;
       let encounteredToolCall = false;
       const toolCallAccumulators = {};
-      const decoder = new TextDecoder("utf-8");
+      const lineDecoder = createSseLineDecoder();
       const reader = poeResponse.body.getReader();
       let done = false;
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
+        const lines = [];
         if (value) {
-          const chunk = decoder.decode(value);
-          debugLog(debug, "Poe response chunk:", chunk);
-          const lines = chunk.split("\n");
+          const decodedLines = lineDecoder.push(value);
+          debugLog(debug, "Poe response lines:", decodedLines);
+          lines.push(...decodedLines);
+        }
+        if (doneReading) {
+          lines.push(...lineDecoder.finish());
+        }
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed === "" || !trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.replace(/^data:\s*/, "");
-            if (dataStr === "[DONE]") {
-              if (encounteredToolCall) {
-                for (const idx in toolCallAccumulators) {
-                  sendSSE(reply, "content_block_stop", {
-                    type: "content_block_stop",
-                    index: parseInt(idx, 10),
-                  });
-                }
-              } else if (textBlockStarted) {
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed === "" || !trimmed.startsWith("data:")) continue;
+          const dataStr = trimmed.replace(/^data:\s*/, "");
+          if (dataStr === "[DONE]") {
+            if (encounteredToolCall) {
+              for (const idx in toolCallAccumulators) {
                 sendSSE(reply, "content_block_stop", {
                   type: "content_block_stop",
-                  index: 0,
+                  index: parseInt(idx, 10),
                 });
               }
-              sendSSE(reply, "message_delta", {
-                type: "message_delta",
-                delta: {
-                  stop_reason: encounteredToolCall ? "tool_use" : "end_turn",
-                  stop_sequence: null,
-                },
-                usage: usage
-                  ? { output_tokens: usage.completion_tokens }
-                  : {
-                      output_tokens:
-                        estimateTokens(accumulatedContent) +
-                        estimateTokens(accumulatedReasoning),
-                    },
+            } else if (textBlockStarted) {
+              sendSSE(reply, "content_block_stop", {
+                type: "content_block_stop",
+                index: 0,
               });
-              sendSSE(reply, "message_stop", {
-                type: "message_stop",
-              });
-              reply.raw.end();
-              return;
             }
+            sendSSE(reply, "message_delta", {
+              type: "message_delta",
+              delta: {
+                stop_reason: encounteredToolCall ? "tool_use" : "end_turn",
+                stop_sequence: null,
+              },
+              usage: usage
+                ? { output_tokens: usage.completion_tokens }
+                : {
+                    output_tokens:
+                      estimateTokens(accumulatedContent) +
+                      estimateTokens(accumulatedReasoning),
+                  },
+            });
+            sendSSE(reply, "message_stop", {
+              type: "message_stop",
+            });
+            reply.raw.end();
+            return;
+          }
 
-            let parsed;
-            try {
-              parsed = JSON.parse(dataStr);
-            } catch (err) {
-              debugLog(debug, "Failed to parse JSON:", dataStr);
-              continue;
-            }
-            if (parsed.error) {
-              throw new Error(parsed.error.message);
-            }
-            sendSuccessMessage();
-            if (parsed.usage) {
-              usage = parsed.usage;
-            }
-            const delta = parsed.choices[0].delta;
-            if (delta && delta.tool_calls) {
-              for (const toolCall of delta.tool_calls) {
-                encounteredToolCall = true;
-                const idx = toolCall.index;
-                const functionDelta = toolCall.function || {};
-                if (toolCallAccumulators[idx] === undefined) {
-                  toolCallAccumulators[idx] = "";
-                  sendSSE(reply, "content_block_start", {
-                    type: "content_block_start",
-                    index: idx,
-                    content_block: {
-                      type: "tool_use",
-                      id: toolCall.id,
-                      name: functionDelta.name,
-                      input: {},
-                    },
-                  });
-                }
-                const newArgs = functionDelta.arguments || "";
-                const oldArgs = toolCallAccumulators[idx];
-                if (newArgs.length > oldArgs.length) {
-                  const deltaText = newArgs.substring(oldArgs.length);
-                  sendSSE(reply, "content_block_delta", {
-                    type: "content_block_delta",
-                    index: idx,
-                    delta: {
-                      type: "input_json_delta",
-                      partial_json: deltaText,
-                    },
-                  });
-                  toolCallAccumulators[idx] = newArgs;
-                }
-              }
-            } else if (delta && delta.content) {
-              if (!textBlockStarted) {
-                textBlockStarted = true;
+          let parsed;
+          try {
+            parsed = JSON.parse(dataStr);
+          } catch (err) {
+            debugLog(debug, "Failed to parse JSON:", dataStr);
+            continue;
+          }
+          if (parsed.error) {
+            throw new Error(parsed.error.message);
+          }
+          sendSuccessMessage();
+          if (parsed.usage) {
+            usage = parsed.usage;
+          }
+          const delta = parsed.choices[0].delta;
+          if (delta && delta.tool_calls) {
+            for (const toolCall of delta.tool_calls) {
+              encounteredToolCall = true;
+              const idx = toolCall.index;
+              const functionDelta = toolCall.function || {};
+              if (toolCallAccumulators[idx] === undefined) {
+                toolCallAccumulators[idx] = "";
                 sendSSE(reply, "content_block_start", {
                   type: "content_block_start",
-                  index: 0,
+                  index: idx,
                   content_block: {
-                    type: "text",
-                    text: "",
+                    type: "tool_use",
+                    id: toolCall.id,
+                    name: functionDelta.name,
+                    input: {},
                   },
                 });
               }
-              accumulatedContent += delta.content;
-              sendSSE(reply, "content_block_delta", {
-                type: "content_block_delta",
-                index: 0,
-                delta: {
-                  type: "text_delta",
-                  text: delta.content,
-                },
-              });
-            } else if (delta && delta.reasoning) {
-              if (!textBlockStarted) {
-                textBlockStarted = true;
-                sendSSE(reply, "content_block_start", {
-                  type: "content_block_start",
-                  index: 0,
-                  content_block: {
-                    type: "text",
-                    text: "",
+              const newArgs = functionDelta.arguments || "";
+              const oldArgs = toolCallAccumulators[idx];
+              if (newArgs.length > oldArgs.length) {
+                const deltaText = newArgs.substring(oldArgs.length);
+                sendSSE(reply, "content_block_delta", {
+                  type: "content_block_delta",
+                  index: idx,
+                  delta: {
+                    type: "input_json_delta",
+                    partial_json: deltaText,
                   },
                 });
+                toolCallAccumulators[idx] = newArgs;
               }
-              accumulatedReasoning += delta.reasoning;
-              sendSSE(reply, "content_block_delta", {
-                type: "content_block_delta",
+            }
+          } else if (delta && delta.content) {
+            if (!textBlockStarted) {
+              textBlockStarted = true;
+              sendSSE(reply, "content_block_start", {
+                type: "content_block_start",
                 index: 0,
-                delta: {
-                  type: "thinking_delta",
-                  thinking: delta.reasoning,
+                content_block: {
+                  type: "text",
+                  text: "",
                 },
               });
             }
+            accumulatedContent += delta.content;
+            sendSSE(reply, "content_block_delta", {
+              type: "content_block_delta",
+              index: 0,
+              delta: {
+                type: "text_delta",
+                text: delta.content,
+              },
+            });
+          } else if (delta && delta.reasoning) {
+            if (!textBlockStarted) {
+              textBlockStarted = true;
+              sendSSE(reply, "content_block_start", {
+                type: "content_block_start",
+                index: 0,
+                content_block: {
+                  type: "text",
+                  text: "",
+                },
+              });
+            }
+            accumulatedReasoning += delta.reasoning;
+            sendSSE(reply, "content_block_delta", {
+              type: "content_block_delta",
+              index: 0,
+              delta: {
+                type: "thinking_delta",
+                thinking: delta.reasoning,
+              },
+            });
           }
         }
       }
 
       reply.raw.end();
     } catch (err) {
+      if (isUpstreamTimeoutError(err)) {
+        console.error("Poe upstream request timed out");
+        if (reply.raw.headersSent) {
+          reply.raw.end();
+          return;
+        }
+        reply.code(504);
+        return { error: "Poe upstream request timed out" };
+      }
       console.error(err);
       reply.code(500);
       return { error: err.message };

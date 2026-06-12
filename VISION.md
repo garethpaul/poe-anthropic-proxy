@@ -15,6 +15,9 @@ The current focus is:
 
 Priority:
 
+- Keep the authenticated proxy and dependency audit baseline running on pinned
+  hosted Linux with Node 20 and Node 24
+
 - Preserve the `/v1/messages` compatibility surface
 - Keep Poe API credentials in environment configuration behind inbound proxy auth
 - Reject requests locally when the server-side Poe key is missing
@@ -24,12 +27,16 @@ Priority:
 - Keep a scriptable baseline guard for package scripts and local metadata
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
+- Keep Poe stream chunk boundaries and split UTF-8 decoding covered by
+  deterministic fixtures
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep upstream error payloads covered by deterministic route tests
+- Keep the upstream request timeout configurable and covered by route tests
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests
 - Keep Poe tool names and schemas validated before upstream forwarding
 - Keep GitHub Actions aligned with the no-live-credentials `make check` gate
+- Keep hosted checkout credential-free and isolate tests from the live Poe URL
 
 Next priorities:
 
