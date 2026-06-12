@@ -455,19 +455,21 @@ export function createServer({
     logger,
   });
   const requestTimeoutMs = upstreamTimeoutConfig(upstreamTimeoutMs);
+  const requestRateLimitMax = positiveIntegerConfig(
+    rateLimitMax,
+    DEFAULT_RATE_LIMIT_MAX,
+    MAX_RATE_LIMIT_MAX
+  );
+  const requestRateLimitWindowMs = positiveIntegerConfig(
+    rateLimitWindowMs,
+    DEFAULT_RATE_LIMIT_WINDOW_MS,
+    MAX_RATE_LIMIT_WINDOW_MS
+  );
 
   fastify.register(rateLimit, {
     global: false,
-    max: positiveIntegerConfig(
-      rateLimitMax,
-      DEFAULT_RATE_LIMIT_MAX,
-      MAX_RATE_LIMIT_MAX
-    ),
-    timeWindow: positiveIntegerConfig(
-      rateLimitWindowMs,
-      DEFAULT_RATE_LIMIT_WINDOW_MS,
-      MAX_RATE_LIMIT_WINDOW_MS
-    ),
+    max: requestRateLimitMax,
+    timeWindow: requestRateLimitWindowMs,
   });
 
   async function handleMessages(request, reply) {
@@ -723,7 +725,14 @@ export function createServer({
   fastify.after(() => {
     fastify.post(
       "/v1/messages",
-      { preHandler: fastify.rateLimit() },
+      {
+        config: {
+          rateLimit: {
+            max: requestRateLimitMax,
+            timeWindow: requestRateLimitWindowMs,
+          },
+        },
+      },
       handleMessages
     );
   });

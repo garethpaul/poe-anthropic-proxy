@@ -55,7 +55,10 @@ for implementation_contract in \
   'import rateLimit from "@fastify/rate-limit"' \
   'fastify.register(rateLimit' \
   'global: false' \
-  'preHandler: fastify.rateLimit()' \
+  'config: {' \
+  'rateLimit: {' \
+  'max: requestRateLimitMax' \
+  'timeWindow: requestRateLimitWindowMs' \
   'POE_RATE_LIMIT_MAX' \
   'POE_RATE_LIMIT_WINDOW_MS'; do
   require_text "poe-proxy.js" "$implementation_contract"
