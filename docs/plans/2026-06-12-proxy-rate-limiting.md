@@ -20,7 +20,11 @@ upstream capacity, sockets, and process resources without a local bound.
 4. Add deterministic route coverage proving the first request succeeds, the
    next request receives HTTP 429, and the rejected request does not call Poe.
 5. Enforce the dependency, registration, configuration, documentation, and
-   regression-test contract in the repository baseline checker.
+   regression-test contract in the repository baseline checker. The static
+   route contract requires the CodeQL-recognized
+   `fastify.post(path, options, handler)` form, verifies that argument two
+   contains `config.rateLimit`, and confirms plugin registration precedes
+   route installation.
 
 ## Verification
 
@@ -34,3 +38,9 @@ upstream capacity, sockets, and process resources without a local bound.
 - Eleven hostile mutations removing the dependency, import, per-route policy,
   environment defaults, route regression, HTTP 429 assertion, documentation,
   or completed plan status were all rejected.
+- After the CodeQL-specific route contract was tightened, the focused HTTP 429
+  test and the full local `make check` gate passed again with all 29 tests and
+  zero audited vulnerabilities.
+- Targeted mutations replacing the `fastify.post` shorthand or removing the
+  argument-two `config` options object were both rejected by the baseline
+  checker.

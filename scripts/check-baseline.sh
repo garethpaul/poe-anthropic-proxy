@@ -63,6 +63,29 @@ for implementation_contract in \
   'POE_RATE_LIMIT_WINDOW_MS'; do
   require_text "poe-proxy.js" "$implementation_contract"
 done
+
+node --input-type=module - "$ROOT_DIR/poe-proxy.js" <<'EOF'
+import { readFileSync } from "node:fs";
+
+const source = readFileSync(process.argv[2], "utf8");
+const registrationIndex = source.indexOf("fastify.register(rateLimit");
+const routePattern = /fastify\.post\(\s*["']\/v1\/messages["']\s*,\s*\{\s*config\s*:\s*\{\s*rateLimit\s*:\s*\{\s*max\s*:\s*requestRateLimitMax\s*,\s*timeWindow\s*:\s*requestRateLimitWindowMs\s*,?\s*\}\s*,?\s*\}\s*,?\s*\}\s*,\s*handleMessages\s*\)/;
+const routeMatch = routePattern.exec(source);
+
+if (!routeMatch) {
+  console.error(
+    "poe-proxy.js must register /v1/messages with the CodeQL-recognized " +
+      "fastify.post(path, options, handler) config.rateLimit contract."
+  );
+  process.exit(1);
+}
+
+if (registrationIndex === -1 || registrationIndex > routeMatch.index) {
+  console.error("@fastify/rate-limit must be registered before /v1/messages is installed.");
+  process.exit(1);
+}
+EOF
+
 for environment_contract in \
   'POE_RATE_LIMIT_MAX=60' \
   'POE_RATE_LIMIT_WINDOW_MS=60000'; do
