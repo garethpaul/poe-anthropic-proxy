@@ -127,3 +127,23 @@ for plan in \
     exit 1
   fi
 done
+
+for streaming_contract in \
+  "function createSseLineDecoder" \
+  'decoder.decode(chunk, { stream: true })' \
+  "lineDecoder.push(value)" \
+  "lineDecoder.finish()" \
+  "createSseLineDecoder preserves split JSON, UTF-8, and final lines" \
+  "createServer preserves streamed SSE data split across byte chunks"; do
+  if ! grep -Fq "$streaming_contract" "$ROOT_DIR/poe-proxy.js" "$ROOT_DIR/test/poe-proxy.test.js"; then
+    printf '%s\n' "Streaming chunk-boundary contract is missing: $streaming_contract" >&2
+    exit 1
+  fi
+done
+
+for document in "$README" "$ROOT_DIR/SECURITY.md" "$ROOT_DIR/VISION.md" "$ROOT_DIR/CHANGES.md"; do
+  if ! grep -Fq "stream chunk boundaries" "$document"; then
+    printf '%s\n' "$document must document stream chunk boundaries." >&2
+    exit 1
+  fi
+done

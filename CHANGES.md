@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-12
+
+- Buffered partial Poe SSE records across stream chunk boundaries before JSON
+  parsing, including split UTF-8 characters and final unterminated lines.
+- Added direct decoder and injected-route regressions proving streamed content
+  survives arbitrary upstream byte segmentation.
+
 ## 2026-06-10
 
 - Added pinned, read-only hosted Linux validation on Node 20 and Node 24 using

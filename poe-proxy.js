@@ -145,6 +145,27 @@ function sendSSE(reply, event, data) {
   }
 }
 
+export function createSseLineDecoder() {
+  const decoder = new TextDecoder("utf-8");
+  let pending = "";
+
+  return {
+    push(chunk) {
+      pending += decoder.decode(chunk, { stream: true });
+      const lines = pending.split("\n");
+      pending = lines.pop();
+      return lines;
+    },
+    finish() {
+      pending += decoder.decode();
+      if (!pending) return [];
+      const finalLine = pending;
+      pending = "";
+      return [finalLine];
+    },
+  };
+}
+
 export function mapStopReason(finishReason) {
   switch (finishReason) {
     case "tool_calls":
@@ -495,148 +516,152 @@ export function createServer({
       let textBlockStarted = false;
       let encounteredToolCall = false;
       const toolCallAccumulators = {};
-      const decoder = new TextDecoder("utf-8");
+      const lineDecoder = createSseLineDecoder();
       const reader = poeResponse.body.getReader();
       let done = false;
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
+        const lines = [];
         if (value) {
-          const chunk = decoder.decode(value);
-          debugLog(debug, "Poe response chunk:", chunk);
-          const lines = chunk.split("\n");
+          const decodedLines = lineDecoder.push(value);
+          debugLog(debug, "Poe response lines:", decodedLines);
+          lines.push(...decodedLines);
+        }
+        if (doneReading) {
+          lines.push(...lineDecoder.finish());
+        }
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed === "" || !trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.replace(/^data:\s*/, "");
-            if (dataStr === "[DONE]") {
-              if (encounteredToolCall) {
-                for (const idx in toolCallAccumulators) {
-                  sendSSE(reply, "content_block_stop", {
-                    type: "content_block_stop",
-                    index: parseInt(idx, 10),
-                  });
-                }
-              } else if (textBlockStarted) {
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed === "" || !trimmed.startsWith("data:")) continue;
+          const dataStr = trimmed.replace(/^data:\s*/, "");
+          if (dataStr === "[DONE]") {
+            if (encounteredToolCall) {
+              for (const idx in toolCallAccumulators) {
                 sendSSE(reply, "content_block_stop", {
                   type: "content_block_stop",
-                  index: 0,
+                  index: parseInt(idx, 10),
                 });
               }
-              sendSSE(reply, "message_delta", {
-                type: "message_delta",
-                delta: {
-                  stop_reason: encounteredToolCall ? "tool_use" : "end_turn",
-                  stop_sequence: null,
-                },
-                usage: usage
-                  ? { output_tokens: usage.completion_tokens }
-                  : {
-                      output_tokens:
-                        estimateTokens(accumulatedContent) +
-                        estimateTokens(accumulatedReasoning),
-                    },
+            } else if (textBlockStarted) {
+              sendSSE(reply, "content_block_stop", {
+                type: "content_block_stop",
+                index: 0,
               });
-              sendSSE(reply, "message_stop", {
-                type: "message_stop",
-              });
-              reply.raw.end();
-              return;
             }
+            sendSSE(reply, "message_delta", {
+              type: "message_delta",
+              delta: {
+                stop_reason: encounteredToolCall ? "tool_use" : "end_turn",
+                stop_sequence: null,
+              },
+              usage: usage
+                ? { output_tokens: usage.completion_tokens }
+                : {
+                    output_tokens:
+                      estimateTokens(accumulatedContent) +
+                      estimateTokens(accumulatedReasoning),
+                  },
+            });
+            sendSSE(reply, "message_stop", {
+              type: "message_stop",
+            });
+            reply.raw.end();
+            return;
+          }
 
-            let parsed;
-            try {
-              parsed = JSON.parse(dataStr);
-            } catch (err) {
-              debugLog(debug, "Failed to parse JSON:", dataStr);
-              continue;
-            }
-            if (parsed.error) {
-              throw new Error(parsed.error.message);
-            }
-            sendSuccessMessage();
-            if (parsed.usage) {
-              usage = parsed.usage;
-            }
-            const delta = parsed.choices[0].delta;
-            if (delta && delta.tool_calls) {
-              for (const toolCall of delta.tool_calls) {
-                encounteredToolCall = true;
-                const idx = toolCall.index;
-                const functionDelta = toolCall.function || {};
-                if (toolCallAccumulators[idx] === undefined) {
-                  toolCallAccumulators[idx] = "";
-                  sendSSE(reply, "content_block_start", {
-                    type: "content_block_start",
-                    index: idx,
-                    content_block: {
-                      type: "tool_use",
-                      id: toolCall.id,
-                      name: functionDelta.name,
-                      input: {},
-                    },
-                  });
-                }
-                const newArgs = functionDelta.arguments || "";
-                const oldArgs = toolCallAccumulators[idx];
-                if (newArgs.length > oldArgs.length) {
-                  const deltaText = newArgs.substring(oldArgs.length);
-                  sendSSE(reply, "content_block_delta", {
-                    type: "content_block_delta",
-                    index: idx,
-                    delta: {
-                      type: "input_json_delta",
-                      partial_json: deltaText,
-                    },
-                  });
-                  toolCallAccumulators[idx] = newArgs;
-                }
-              }
-            } else if (delta && delta.content) {
-              if (!textBlockStarted) {
-                textBlockStarted = true;
+          let parsed;
+          try {
+            parsed = JSON.parse(dataStr);
+          } catch (err) {
+            debugLog(debug, "Failed to parse JSON:", dataStr);
+            continue;
+          }
+          if (parsed.error) {
+            throw new Error(parsed.error.message);
+          }
+          sendSuccessMessage();
+          if (parsed.usage) {
+            usage = parsed.usage;
+          }
+          const delta = parsed.choices[0].delta;
+          if (delta && delta.tool_calls) {
+            for (const toolCall of delta.tool_calls) {
+              encounteredToolCall = true;
+              const idx = toolCall.index;
+              const functionDelta = toolCall.function || {};
+              if (toolCallAccumulators[idx] === undefined) {
+                toolCallAccumulators[idx] = "";
                 sendSSE(reply, "content_block_start", {
                   type: "content_block_start",
-                  index: 0,
+                  index: idx,
                   content_block: {
-                    type: "text",
-                    text: "",
+                    type: "tool_use",
+                    id: toolCall.id,
+                    name: functionDelta.name,
+                    input: {},
                   },
                 });
               }
-              accumulatedContent += delta.content;
-              sendSSE(reply, "content_block_delta", {
-                type: "content_block_delta",
-                index: 0,
-                delta: {
-                  type: "text_delta",
-                  text: delta.content,
-                },
-              });
-            } else if (delta && delta.reasoning) {
-              if (!textBlockStarted) {
-                textBlockStarted = true;
-                sendSSE(reply, "content_block_start", {
-                  type: "content_block_start",
-                  index: 0,
-                  content_block: {
-                    type: "text",
-                    text: "",
+              const newArgs = functionDelta.arguments || "";
+              const oldArgs = toolCallAccumulators[idx];
+              if (newArgs.length > oldArgs.length) {
+                const deltaText = newArgs.substring(oldArgs.length);
+                sendSSE(reply, "content_block_delta", {
+                  type: "content_block_delta",
+                  index: idx,
+                  delta: {
+                    type: "input_json_delta",
+                    partial_json: deltaText,
                   },
                 });
+                toolCallAccumulators[idx] = newArgs;
               }
-              accumulatedReasoning += delta.reasoning;
-              sendSSE(reply, "content_block_delta", {
-                type: "content_block_delta",
+            }
+          } else if (delta && delta.content) {
+            if (!textBlockStarted) {
+              textBlockStarted = true;
+              sendSSE(reply, "content_block_start", {
+                type: "content_block_start",
                 index: 0,
-                delta: {
-                  type: "thinking_delta",
-                  thinking: delta.reasoning,
+                content_block: {
+                  type: "text",
+                  text: "",
                 },
               });
             }
+            accumulatedContent += delta.content;
+            sendSSE(reply, "content_block_delta", {
+              type: "content_block_delta",
+              index: 0,
+              delta: {
+                type: "text_delta",
+                text: delta.content,
+              },
+            });
+          } else if (delta && delta.reasoning) {
+            if (!textBlockStarted) {
+              textBlockStarted = true;
+              sendSSE(reply, "content_block_start", {
+                type: "content_block_start",
+                index: 0,
+                content_block: {
+                  type: "text",
+                  text: "",
+                },
+              });
+            }
+            accumulatedReasoning += delta.reasoning;
+            sendSSE(reply, "content_block_delta", {
+              type: "content_block_delta",
+              index: 0,
+              delta: {
+                type: "thinking_delta",
+                thinking: delta.reasoning,
+              },
+            });
           }
         }
       }

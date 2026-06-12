@@ -6,6 +6,7 @@ import {
   buildAnthropicResponse,
   buildPoeMessages,
   buildPoePayload,
+  createSseLineDecoder,
   createServer,
   isDebugEnabled,
   loadConfig,
@@ -27,6 +28,22 @@ async function withMutedConsoleError(callback) {
     console.error = originalError;
   }
 }
+
+test("createSseLineDecoder preserves split JSON, UTF-8, and final lines", () => {
+  const decoder = createSseLineDecoder();
+  const encoded = new TextEncoder().encode(
+    'data: {"choices":[{"delta":{"content":"café"}}]}\n\ndata: [DONE]'
+  );
+  const splitIndex = encoded.indexOf(0xc3) + 1;
+
+  assert.deepEqual(decoder.push(encoded.slice(0, splitIndex)), []);
+  assert.deepEqual(decoder.push(encoded.slice(splitIndex)), [
+    'data: {"choices":[{"delta":{"content":"café"}}]}',
+    "",
+  ]);
+  assert.deepEqual(decoder.finish(), ["data: [DONE]"]);
+  assert.deepEqual(decoder.finish(), []);
+});
 
 test("buildPoeMessages converts Anthropic messages to Poe chat messages", () => {
   const messages = buildPoeMessages({
@@ -620,6 +637,49 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     assert.deepEqual(response.json().content, [
       { text: "Hello from Poe", type: "text" },
     ]);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer preserves streamed SSE data split across byte chunks", async () => {
+  const encoded = new TextEncoder().encode(
+    'data: {"choices":[{"delta":{"content":"café"}}]}\n\ndata: [DONE]'
+  );
+  const splitIndex = encoded.indexOf(0xc3) + 1;
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoded.slice(0, splitIndex));
+          controller.enqueue(encoded.slice(splitIndex));
+          controller.close();
+        },
+      }),
+    }),
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: {
+        authorization: "Bearer proxy-key",
+      },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+        stream: true,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /event: message_start/);
+    assert.match(response.body, /"text":"café"/);
+    assert.match(response.body, /event: message_stop/);
   } finally {
     await server.close();
   }

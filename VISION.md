@@ -27,6 +27,8 @@ Priority:
 - Keep a scriptable baseline guard for package scripts and local metadata
 - Maintain deterministic tests that do not require live Poe calls
 - Keep tool-call and streaming behavior covered by fixtures
+- Keep Poe stream chunk boundaries and split UTF-8 decoding covered by
+  deterministic fixtures
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep upstream error payloads covered by deterministic route tests
 - Keep the upstream request timeout configurable and covered by route tests

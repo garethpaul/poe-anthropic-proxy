@@ -63,6 +63,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   token or upstream Poe key is missing.
 - Every Poe fetch has a bounded upstream request timeout; pre-stream timeouts
   return a stable `504` response.
+- Streaming translation buffers partial SSE lines and UTF-8 bytes across stream
+  chunk boundaries so network segmentation cannot drop response content.
 - Use `npm run lint`, `npm run build`, `make lint`, and `make build` as stable
   local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local
@@ -131,6 +133,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   instead of leaking generic property-access failures.
 - Upstream Poe error payloads are returned without attempting success-response
   mapping, and empty error bodies get a status-based fallback message.
+- Poe stream chunk boundaries are reconstructed before JSON parsing, including
+  split multibyte text and a final line without a trailing newline.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
   of leaking generic JSON parse failures.
 - Malformed Poe tool definitions are ignored before forwarding instead of

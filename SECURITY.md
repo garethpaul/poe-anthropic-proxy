@@ -58,6 +58,8 @@ Every Poe request should use a bounded upstream request timeout so stalled
 connections cannot retain proxy resources indefinitely.
 Timeout responses and logs should use stable text rather than raw runtime error
 details.
+Poe stream chunk boundaries must be buffered before JSON parsing so ordinary
+network segmentation cannot silently remove translated response content.
 
 ## Dependency and Supply Chain Security
 
