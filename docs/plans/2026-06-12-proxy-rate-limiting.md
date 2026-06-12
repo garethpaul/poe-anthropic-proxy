@@ -11,8 +11,9 @@ upstream capacity, sockets, and process resources without a local bound.
 
 ## Decision
 
-1. Register the maintained Fastify rate-limit plugin before routes so rejected
-   requests do not reach authentication, payload conversion, or Poe.
+1. Register the maintained Fastify rate-limit plugin and attach its explicit
+   pre-handler to `/v1/messages` so rejected requests do not reach
+   authentication, payload conversion, or Poe.
 2. Default to 60 requests per 60-second window per client address.
 3. Accept bounded positive-integer environment overrides for deployment
    tuning while falling back safely for missing or malformed values.
@@ -30,6 +31,6 @@ upstream capacity, sockets, and process resources without a local bound.
 - `npm run lint` and `npm run build` passed on both declared runtimes.
 - `npm audit --audit-level=moderate` reported zero vulnerabilities across the
   53-package installed graph.
-- Nine hostile mutations removing the dependency, import, global scope,
+- Ten hostile mutations removing the dependency, import, route pre-handler,
   environment defaults, route regression, HTTP 429 assertion, documentation,
   or completed plan status were all rejected.

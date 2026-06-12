@@ -457,7 +457,7 @@ export function createServer({
   const requestTimeoutMs = upstreamTimeoutConfig(upstreamTimeoutMs);
 
   fastify.register(rateLimit, {
-    global: true,
+    global: false,
     max: positiveIntegerConfig(
       rateLimitMax,
       DEFAULT_RATE_LIMIT_MAX,
@@ -721,7 +721,11 @@ export function createServer({
   }
 
   fastify.after(() => {
-    fastify.post("/v1/messages", handleMessages);
+    fastify.post(
+      "/v1/messages",
+      { preHandler: fastify.rateLimit() },
+      handleMessages
+    );
   });
 
   return fastify;

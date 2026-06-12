@@ -54,7 +54,8 @@ require_text "package.json" '"@fastify/rate-limit": "11.0.0"'
 for implementation_contract in \
   'import rateLimit from "@fastify/rate-limit"' \
   'fastify.register(rateLimit' \
-  'global: true' \
+  'global: false' \
+  'preHandler: fastify.rateLimit()' \
   'POE_RATE_LIMIT_MAX' \
   'POE_RATE_LIMIT_WINDOW_MS'; do
   require_text "poe-proxy.js" "$implementation_contract"
