@@ -104,6 +104,8 @@ deterministic Node tests, the build alias, and `npm audit --audit-level=moderate
 It then runs `scripts/check-baseline.sh` to verify package script wiring,
 completed plan metadata, credential documentation, and local metadata ignores.
 The tests do not require a live Poe API key or network access.
+GitHub Actions installs dependencies with `npm ci` on Node 24 and runs the same
+`make check` gate on pushes and pull requests without live Poe credentials.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -152,6 +154,7 @@ When the required SDK or runtime is unavailable, use static checks and source re
   upstream Poe error payload handling.
 - See `docs/plans/2026-06-09-scripted-baseline-check.md` for the scripted
   repository baseline guard.
+- See `docs/plans/2026-06-10-ci-baseline.md` for the GitHub Actions baseline.
 
 ## Contributing
 

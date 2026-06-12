@@ -29,6 +29,7 @@ Priority:
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests
 - Keep Poe tool names and schemas validated before upstream forwarding
+- Keep GitHub Actions aligned with the no-live-credentials `make check` gate
 
 Next priorities:
 

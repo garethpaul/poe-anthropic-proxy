@@ -2,6 +2,8 @@
 
 ## 2026-06-10
 
+- Added a GitHub Actions workflow that installs dependencies on Node 24 and
+  runs the local `make check` gate without live Poe credentials.
 - Added deterministic route coverage for upstream Poe error payloads and empty
   upstream error-body fallbacks.
 

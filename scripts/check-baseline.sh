@@ -17,6 +17,7 @@ require_file() {
 }
 
 for path in \
+  ".github/workflows/check.yml" \
   ".env.example" \
   ".gitignore" \
   "CHANGES.md" \
@@ -30,6 +31,7 @@ for path in \
   "test/poe-proxy.test.js" \
   "docs/plans/2026-06-08-poe-proxy-check-wrapper.md" \
   "docs/plans/2026-06-09-scripted-baseline-check.md" \
+  "docs/plans/2026-06-10-ci-baseline.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
 done
@@ -58,7 +60,15 @@ for package_script in \
   fi
 done
 
-for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "make check" "npm run verify" "scripts/check-baseline.sh"; do
+if ! grep -Fq "actions/setup-node@v4" "$ROOT_DIR/.github/workflows/check.yml" ||
+  ! grep -Fq 'node-version: "24"' "$ROOT_DIR/.github/workflows/check.yml" ||
+  ! grep -Fq "npm ci" "$ROOT_DIR/.github/workflows/check.yml" ||
+  ! grep -Fq "make check" "$ROOT_DIR/.github/workflows/check.yml"; then
+  printf '%s\n' "GitHub Actions workflow must install dependencies on Node 24 and run make check." >&2
+  exit 1
+fi
+
+for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "make check" "npm run verify" "scripts/check-baseline.sh" "GitHub Actions"; do
   if ! grep -Fq "$documented" "$README"; then
     printf '%s\n' "README must document $documented." >&2
     exit 1
@@ -100,7 +110,8 @@ fi
 
 for plan in \
   "$DOCS_PLANS/2026-06-08-poe-proxy-check-wrapper.md" \
-  "$DOCS_PLANS/2026-06-09-scripted-baseline-check.md"; do
+  "$DOCS_PLANS/2026-06-09-scripted-baseline-check.md" \
+  "$DOCS_PLANS/2026-06-10-ci-baseline.md"; do
   if ! grep -Fq "make check" "$plan"; then
     printf '%s\n' "$plan must document make check verification." >&2
     exit 1

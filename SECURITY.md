@@ -54,6 +54,9 @@ Malformed Poe tool definitions should be ignored before forwarding instead of
 leaking generic request-shape failures.
 Invalid tool names or schemas should be treated as malformed Poe tool
 definitions and omitted locally before upstream forwarding.
+GitHub Actions runs the same no-live-credentials `make check` gate as local
+development. Do not add live Poe calls, deployment, or credentialed smoke tests
+to that workflow without a separate security review.
 
 ## Dependency and Supply Chain Security
 
