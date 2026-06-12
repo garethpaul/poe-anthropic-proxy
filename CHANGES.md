@@ -2,6 +2,8 @@
 
 ## 2026-06-12
 
+- Added configurable per-client request limiting ahead of authentication and
+  upstream Poe work, with deterministic HTTP 429 coverage.
 - Buffered partial Poe SSE records across stream chunk boundaries before JSON
   parsing, including split UTF-8 characters and final unterminated lines.
 - Added direct decoder and injected-route regressions proving streamed content
@@ -10,8 +12,8 @@
 ## 2026-06-10
 
 - Added pinned, read-only hosted Linux validation on Node 20 and Node 24 using
-  lockfile installation and the full proxy security gate.
-
+- Disabled persisted checkout credentials and forced hosted validation to use
+  an invalid upstream URL with blank Poe credentials.
 - Added deterministic route coverage for upstream Poe error payloads and empty
   upstream error-body fallbacks.
 - Added a configurable 30-second Poe upstream request timeout with stable `504`

@@ -16,8 +16,18 @@ require_file() {
   fi
 }
 
+require_text() {
+  path=$1
+  text=$2
+  if ! grep -Fq "$text" "$ROOT_DIR/$path"; then
+    printf '%s\n' "$path must preserve the contract: $text" >&2
+    exit 1
+  fi
+}
+
 for path in \
   ".github/workflows/check.yml" \
+  "AGENTS.md" \
   ".env.example" \
   ".gitignore" \
   "CHANGES.md" \
@@ -31,28 +41,103 @@ for path in \
   "test/poe-proxy.test.js" \
   "docs/plans/2026-06-08-poe-proxy-check-wrapper.md" \
   "docs/plans/2026-06-09-scripted-baseline-check.md" \
+  "docs/plans/2026-06-10-ci-baseline.md" \
   "docs/plans/2026-06-10-hosted-proxy-validation.md" \
   "docs/plans/2026-06-10-poe-proxy-upstream-timeout.md" \
+  "docs/plans/2026-06-12-credential-free-hosted-validation.md" \
+  "docs/plans/2026-06-12-proxy-rate-limiting.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
 done
 
-for workflow_value in \
-  "permissions:" \
-  "contents: read" \
-  "cancel-in-progress: true" \
-  "runs-on: ubuntu-24.04" \
-  "timeout-minutes: 10" \
-  "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10" \
-  "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e" \
-  "node-version: [20, 24]" \
-  "run: npm ci" \
-  "run: make check"; do
-  if ! grep -Fq "$workflow_value" "$ROOT_DIR/.github/workflows/check.yml"; then
-    printf '%s\n' "GitHub Actions workflow must include: $workflow_value" >&2
-    exit 1
-  fi
+require_text "package.json" '"@fastify/rate-limit": "11.0.0"'
+for implementation_contract in \
+  'import rateLimit from "@fastify/rate-limit"' \
+  'fastify.register(rateLimit' \
+  'global: false' \
+  'config: {' \
+  'rateLimit: {' \
+  'max: requestRateLimitMax' \
+  'timeWindow: requestRateLimitWindowMs' \
+  'POE_RATE_LIMIT_MAX' \
+  'POE_RATE_LIMIT_WINDOW_MS'; do
+  require_text "poe-proxy.js" "$implementation_contract"
 done
+
+node --input-type=module - "$ROOT_DIR/poe-proxy.js" <<'EOF'
+import { readFileSync } from "node:fs";
+
+const source = readFileSync(process.argv[2], "utf8");
+const registrationIndex = source.indexOf("fastify.register(rateLimit");
+const routePattern = /fastify\.post\(\s*["']\/v1\/messages["']\s*,\s*\{\s*config\s*:\s*\{\s*rateLimit\s*:\s*\{\s*max\s*:\s*requestRateLimitMax\s*,\s*timeWindow\s*:\s*requestRateLimitWindowMs\s*,?\s*\}\s*,?\s*\}\s*,?\s*\}\s*,\s*handleMessages\s*\)/;
+const routeMatch = routePattern.exec(source);
+
+if (!routeMatch) {
+  console.error(
+    "poe-proxy.js must register /v1/messages with the CodeQL-recognized " +
+      "fastify.post(path, options, handler) config.rateLimit contract."
+  );
+  process.exit(1);
+}
+
+if (registrationIndex === -1 || registrationIndex > routeMatch.index) {
+  console.error("@fastify/rate-limit must be registered before /v1/messages is installed.");
+  process.exit(1);
+}
+EOF
+
+for environment_contract in \
+  'POE_RATE_LIMIT_MAX=60' \
+  'POE_RATE_LIMIT_WINDOW_MS=60000'; do
+  require_text ".env.example" "$environment_contract"
+done
+for test_contract in \
+  'createServer rate limits requests before additional upstream work' \
+  'assert.equal(limited.statusCode, 429)' \
+  'assert.equal(fetchCalls, 1)'; do
+  require_text "test/poe-proxy.test.js" "$test_contract"
+done
+
+expected_workflow=$(cat <<'EOF'
+name: Check
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 24]
+    env:
+      POE_API_KEY: ""
+      POE_PROXY_API_KEY: ""
+      POE_BASE_URL: "https://invalid.example"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: make check
+EOF
+)
+actual_workflow=$(cat "$ROOT_DIR/.github/workflows/check.yml")
+if [ "$actual_workflow" != "$expected_workflow" ]; then
+  printf '%s\n' "GitHub Actions workflow must match the exact pinned, credential-free proxy validation contract." >&2
+  exit 1
+fi
 
 if ! grep -Fq "scripts/check-baseline.sh" "$MAKEFILE"; then
   printf '%s\n' "Makefile must run scripts/check-baseline.sh from make check." >&2
@@ -78,9 +163,16 @@ for package_script in \
   fi
 done
 
-for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "upstream request timeout" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux"; do
+for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "POE_RATE_LIMIT_MAX" "POE_RATE_LIMIT_WINDOW_MS" "upstream request timeout" "HTTP 429" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux" "GitHub Actions"; do
   if ! grep -Fq "$documented" "$README"; then
     printf '%s\n' "README must document $documented." >&2
+    exit 1
+  fi
+done
+
+for guardrail in "POE_API_KEY" "POE_PROXY_API_KEY" "127.0.0.1" "do not commit real"; do
+  if ! grep -Fqi "$guardrail" "$ROOT_DIR/AGENTS.md"; then
+    printf '%s\n' "AGENTS.md must preserve the guardrail: $guardrail" >&2
     exit 1
   fi
 done
@@ -103,7 +195,7 @@ found_plan=0
 for plan in "$DOCS_PLANS"/*.md; do
   [ -e "$plan" ] || continue
   found_plan=1
-  if ! grep -iq "status" "$plan" || ! grep -iq "completed" "$plan"; then
+  if [ "$(grep -Eic '^status: completed$' "$plan")" -ne 1 ]; then
     printf '%s\n' "$plan must record completed status." >&2
     exit 1
   fi
@@ -121,7 +213,9 @@ fi
 for plan in \
   "$DOCS_PLANS/2026-06-08-poe-proxy-check-wrapper.md" \
   "$DOCS_PLANS/2026-06-09-scripted-baseline-check.md" \
-  "$DOCS_PLANS/2026-06-10-hosted-proxy-validation.md"; do
+  "$DOCS_PLANS/2026-06-10-ci-baseline.md" \
+  "$DOCS_PLANS/2026-06-10-hosted-proxy-validation.md" \
+  "$DOCS_PLANS/2026-06-12-credential-free-hosted-validation.md"; do
   if ! grep -Fq "make check" "$plan"; then
     printf '%s\n' "$plan must document make check verification." >&2
     exit 1
