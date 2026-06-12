@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import Fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { timingSafeEqual } from "node:crypto";
 import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -11,6 +12,10 @@ const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
 const MAX_UPSTREAM_TIMEOUT_MS = 300_000;
+const DEFAULT_RATE_LIMIT_MAX = 60;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_RATE_LIMIT_MAX = 10_000;
+const MAX_RATE_LIMIT_WINDOW_MS = 3_600_000;
 const POE_TOOL_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function isDebugEnabled(value) {
@@ -31,15 +36,21 @@ function optionalConfigValue(value) {
   return normalized || undefined;
 }
 
-function upstreamTimeoutConfig(value) {
+function positiveIntegerConfig(value, fallback, maximum) {
   const normalized = String(value || "").trim();
-  if (!/^\d+$/.test(normalized)) return DEFAULT_UPSTREAM_TIMEOUT_MS;
+  if (!/^\d+$/.test(normalized)) return fallback;
   const parsed = Number(normalized);
-  return Number.isSafeInteger(parsed) &&
-    parsed > 0 &&
-    parsed <= MAX_UPSTREAM_TIMEOUT_MS
+  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= maximum
     ? parsed
-    : DEFAULT_UPSTREAM_TIMEOUT_MS;
+    : fallback;
+}
+
+function upstreamTimeoutConfig(value) {
+  return positiveIntegerConfig(
+    value,
+    DEFAULT_UPSTREAM_TIMEOUT_MS,
+    MAX_UPSTREAM_TIMEOUT_MS
+  );
 }
 
 export function loadConfig(env = process.env) {
@@ -51,6 +62,16 @@ export function loadConfig(env = process.env) {
     host: configValue(env.HOST, DEFAULT_HOST),
     port: configValue(env.PORT, DEFAULT_PORT),
     upstreamTimeoutMs: upstreamTimeoutConfig(env.POE_UPSTREAM_TIMEOUT_MS),
+    rateLimitMax: positiveIntegerConfig(
+      env.POE_RATE_LIMIT_MAX,
+      DEFAULT_RATE_LIMIT_MAX,
+      MAX_RATE_LIMIT_MAX
+    ),
+    rateLimitWindowMs: positiveIntegerConfig(
+      env.POE_RATE_LIMIT_WINDOW_MS,
+      DEFAULT_RATE_LIMIT_WINDOW_MS,
+      MAX_RATE_LIMIT_WINDOW_MS
+    ),
     debug: isDebugEnabled(env.DEBUG),
   };
 }
@@ -425,6 +446,8 @@ export function createServer({
   defaultModel = DEFAULT_MODEL,
   fetchImpl = fetch,
   upstreamTimeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS,
+  rateLimitMax = DEFAULT_RATE_LIMIT_MAX,
+  rateLimitWindowMs = DEFAULT_RATE_LIMIT_WINDOW_MS,
   debug = false,
   logger = true,
 } = {}) {
@@ -433,7 +456,21 @@ export function createServer({
   });
   const requestTimeoutMs = upstreamTimeoutConfig(upstreamTimeoutMs);
 
-  fastify.post("/v1/messages", async (request, reply) => {
+  fastify.register(rateLimit, {
+    global: true,
+    max: positiveIntegerConfig(
+      rateLimitMax,
+      DEFAULT_RATE_LIMIT_MAX,
+      MAX_RATE_LIMIT_MAX
+    ),
+    timeWindow: positiveIntegerConfig(
+      rateLimitWindowMs,
+      DEFAULT_RATE_LIMIT_WINDOW_MS,
+      MAX_RATE_LIMIT_WINDOW_MS
+    ),
+  });
+
+  async function handleMessages(request, reply) {
     try {
       const authError = validateProxyAuthorization(request.headers, proxyApiKey);
       if (authError) {
@@ -681,6 +718,10 @@ export function createServer({
       reply.code(500);
       return { error: err.message };
     }
+  }
+
+  fastify.after(() => {
+    fastify.post("/v1/messages", handleMessages);
   });
 
   return fastify;

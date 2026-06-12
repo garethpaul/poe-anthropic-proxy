@@ -59,6 +59,8 @@ development. Do not add live Poe calls, deployment, or credentialed smoke tests
 to that workflow without a separate security review.
 Every Poe request should use a bounded upstream request timeout so stalled
 connections cannot retain proxy resources indefinitely.
+Rate limiting must run before proxy authorization and upstream work so abusive
+clients cannot consume unbounded request or Poe capacity.
 Timeout responses and logs should use stable text rather than raw runtime error
 details.
 Poe stream chunk boundaries must be buffered before JSON parsing so ordinary

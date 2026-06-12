@@ -2,6 +2,8 @@
 
 ## 2026-06-12
 
+- Added configurable per-client request limiting ahead of authentication and
+  upstream Poe work, with deterministic HTTP 429 coverage.
 - Buffered partial Poe SSE records across stream chunk boundaries before JSON
   parsing, including split UTF-8 characters and final unterminated lines.
 - Added direct decoder and injected-route regressions proving streamed content

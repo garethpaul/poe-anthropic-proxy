@@ -16,6 +16,15 @@ require_file() {
   fi
 }
 
+require_text() {
+  path=$1
+  text=$2
+  if ! grep -Fq "$text" "$ROOT_DIR/$path"; then
+    printf '%s\n' "$path must preserve the contract: $text" >&2
+    exit 1
+  fi
+}
+
 for path in \
   ".github/workflows/check.yml" \
   "AGENTS.md" \
@@ -36,8 +45,30 @@ for path in \
   "docs/plans/2026-06-10-hosted-proxy-validation.md" \
   "docs/plans/2026-06-10-poe-proxy-upstream-timeout.md" \
   "docs/plans/2026-06-12-credential-free-hosted-validation.md" \
+  "docs/plans/2026-06-12-proxy-rate-limiting.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
+done
+
+require_text "package.json" '"@fastify/rate-limit": "11.0.0"'
+for implementation_contract in \
+  'import rateLimit from "@fastify/rate-limit"' \
+  'fastify.register(rateLimit' \
+  'global: true' \
+  'POE_RATE_LIMIT_MAX' \
+  'POE_RATE_LIMIT_WINDOW_MS'; do
+  require_text "poe-proxy.js" "$implementation_contract"
+done
+for environment_contract in \
+  'POE_RATE_LIMIT_MAX=60' \
+  'POE_RATE_LIMIT_WINDOW_MS=60000'; do
+  require_text ".env.example" "$environment_contract"
+done
+for test_contract in \
+  'createServer rate limits requests before additional upstream work' \
+  'assert.equal(limited.statusCode, 429)' \
+  'assert.equal(fetchCalls, 1)'; do
+  require_text "test/poe-proxy.test.js" "$test_contract"
 done
 
 expected_workflow=$(cat <<'EOF'
@@ -105,7 +136,7 @@ for package_script in \
   fi
 done
 
-for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "upstream request timeout" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux" "GitHub Actions"; do
+for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "POE_RATE_LIMIT_MAX" "POE_RATE_LIMIT_WINDOW_MS" "upstream request timeout" "HTTP 429" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux" "GitHub Actions"; do
   if ! grep -Fq "$documented" "$README"; then
     printf '%s\n' "README must document $documented." >&2
     exit 1
