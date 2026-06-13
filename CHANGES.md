@@ -2,6 +2,9 @@
 
 ## 2026-06-13
 
+- Added bounded `POE_MODEL_MAPPINGS_JSON` overrides while preserving and
+  documenting the seven built-in Anthropic-to-Poe model mappings.
+
 - Documented mapped, partially normalized, and ignored Anthropic request fields
   without changing proxy translation behavior.
 

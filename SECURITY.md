@@ -76,6 +76,12 @@ domain so an accidental live request cannot reach Poe during hosted validation.
 
 Dependency updates should come from trusted package managers and should keep lockfiles in sync when lockfiles exist. Do not commit credentials, private keys, tokens, generated secrets, or machine-local configuration. If a vulnerability depends on a compromised package, typosquatting risk, insecure transitive dependency, or unsafe build step, include the package name, affected version, and the path through which it is used.
 
+Treat `POE_MODEL_MAPPINGS_JSON` model mapping overrides as deployment
+configuration, not a secret. Keep
+it within the documented size and entry limits, use only reviewed model and bot
+names, and do not log its contents. Invalid shapes stop configuration loading
+before the server starts.
+
 ## Safe Research Guidelines
 
 The ignored Anthropic request fields documented in
