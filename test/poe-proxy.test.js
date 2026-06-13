@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  DEFAULT_MODEL_MAPPINGS,
   buildAnthropicResponse,
   buildPoeMessages,
   buildPoePayload,
@@ -12,6 +13,7 @@ import {
   loadConfig,
   mapModelName,
   mapStopReason,
+  parseModelMappings,
   removeUriFormat,
 } from "../poe-proxy.js";
 
@@ -221,6 +223,29 @@ test("model, stop reason, and debug mappings are deterministic", () => {
   assert.equal(isDebugEnabled("1"), true);
 });
 
+test("custom model mappings override visible defaults and reject invalid config", () => {
+  assert.equal(DEFAULT_MODEL_MAPPINGS["claude-sonnet-4-20250514"], "Claude-Sonnet-4");
+  const mappings = parseModelMappings(
+    '{"claude-sonnet-4-20250514":"Private-Sonnet","custom-model":"Custom-Bot"}'
+  );
+  assert.equal(mapModelName("claude-sonnet-4-20250514", mappings), "Private-Sonnet");
+  assert.equal(mapModelName("custom-model", mappings), "Custom-Bot");
+  assert.equal(mapModelName("unknown-model", mappings), "unknown-model");
+  for (const invalid of ["[]", '{"model":1}', '{" ":"target"}', '{"__proto__":"target"}']) {
+    assert.throws(() => parseModelMappings(invalid), /POE_MODEL_MAPPINGS_JSON/);
+  }
+  assert.throws(
+    () => parseModelMappings(JSON.stringify({ model: "x".repeat(16_384) })),
+    /exceeds 16384 bytes/
+  );
+  assert.throws(
+    () => parseModelMappings(JSON.stringify(Object.fromEntries(
+      Array.from({ length: 101 }, (_, index) => [`model-${index}`, `target-${index}`])
+    ))),
+    /exceeds 100 entries/
+  );
+});
+
 test("loadConfig binds localhost by default and reads proxy auth", () => {
   const config = loadConfig({
     POE_API_KEY: "poe-key",
@@ -251,6 +276,7 @@ test("loadConfig trims environment values and ignores blank credentials", () => 
     HOST: " 127.0.0.1 ",
     POE_BASE_URL: " ",
     POE_MODEL: " Claude-Sonnet-4 ",
+    POE_MODEL_MAPPINGS_JSON: '{"claude-sonnet-4-20250514":"Private-Sonnet"}',
     PORT: " ",
   });
 
@@ -259,6 +285,7 @@ test("loadConfig trims environment values and ignores blank credentials", () => 
   assert.equal(config.host, "127.0.0.1");
   assert.equal(config.baseUrl, "https://api.poe.com");
   assert.equal(config.defaultModel, "Claude-Sonnet-4");
+  assert.equal(config.modelMappings["claude-sonnet-4-20250514"], "Private-Sonnet");
   assert.equal(config.port, 3000);
 });
 
@@ -269,6 +296,7 @@ test(".env.example documents required proxy credentials", () => {
     "POE_PROXY_API_KEY",
     "POE_BASE_URL",
     "POE_MODEL",
+    "POE_MODEL_MAPPINGS_JSON",
     "POE_UPSTREAM_TIMEOUT_MS",
     "POE_RATE_LIMIT_MAX",
     "POE_RATE_LIMIT_WINDOW_MS",
@@ -592,6 +620,9 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     proxyApiKey: "proxy-key",
     baseUrl: "https://example.test",
     defaultModel: "claude-sonnet-4-20250514",
+    modelMappings: parseModelMappings(
+      '{"claude-sonnet-4-20250514":"Private-Sonnet"}'
+    ),
     logger: false,
     fetchImpl: async (url, options) => {
       capturedRequest = { url, options };
@@ -637,7 +668,7 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     assert.equal(capturedRequest.options.headers.Authorization, "Bearer test-key");
     assert.ok(capturedRequest.options.signal instanceof AbortSignal);
     assert.deepEqual(JSON.parse(capturedRequest.options.body), {
-      model: "Claude-Sonnet-4",
+      model: "Private-Sonnet",
       messages: [{ role: "user", content: "Hello" }],
       max_tokens: 25,
       temperature: 1,

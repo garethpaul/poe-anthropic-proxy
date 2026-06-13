@@ -16,7 +16,18 @@ const DEFAULT_RATE_LIMIT_MAX = 60;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_RATE_LIMIT_MAX = 10_000;
 const MAX_RATE_LIMIT_WINDOW_MS = 3_600_000;
+const MAX_MODEL_MAPPINGS_BYTES = 16_384;
+const MAX_MODEL_MAPPINGS_ENTRIES = 100;
 const POE_TOOL_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
+export const DEFAULT_MODEL_MAPPINGS = Object.freeze({
+  "claude-sonnet-4-20250514": "Claude-Sonnet-4",
+  "claude-3-5-sonnet-20241022": "Claude-Sonnet-3.5",
+  "claude-3-5-sonnet-20240620": "Claude-Sonnet-3.5",
+  "claude-3-5-haiku-20241022": "Claude-Haiku-3.5",
+  "claude-3-opus-20240229": "Claude-Opus-3",
+  "claude-3-sonnet-20240229": "Claude-Sonnet-3",
+  "claude-3-haiku-20240307": "Claude-Haiku-3",
+});
 
 export function isDebugEnabled(value) {
   return ["1", "true", "yes", "on"].includes(
@@ -53,12 +64,46 @@ function upstreamTimeoutConfig(value) {
   );
 }
 
+export function parseModelMappings(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return DEFAULT_MODEL_MAPPINGS;
+  if (Buffer.byteLength(normalized, "utf8") > MAX_MODEL_MAPPINGS_BYTES) {
+    throw new Error("POE_MODEL_MAPPINGS_JSON exceeds 16384 bytes");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(normalized);
+  } catch {
+    throw new Error("POE_MODEL_MAPPINGS_JSON must be valid JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("POE_MODEL_MAPPINGS_JSON must be a JSON object");
+  }
+
+  const entries = Object.entries(parsed);
+  if (entries.length > MAX_MODEL_MAPPINGS_ENTRIES) {
+    throw new Error("POE_MODEL_MAPPINGS_JSON exceeds 100 entries");
+  }
+  const mappings = { ...DEFAULT_MODEL_MAPPINGS };
+  for (const [rawName, rawTarget] of entries) {
+    const name = rawName.trim();
+    const target = typeof rawTarget === "string" ? rawTarget.trim() : "";
+    if (!name || !target || ["__proto__", "constructor", "prototype"].includes(name)) {
+      throw new Error("POE_MODEL_MAPPINGS_JSON entries must be safe nonempty strings");
+    }
+    mappings[name] = target;
+  }
+  return Object.freeze(mappings);
+}
+
 export function loadConfig(env = process.env) {
   return {
     baseUrl: configValue(env.POE_BASE_URL, DEFAULT_BASE_URL),
     apiKey: optionalConfigValue(env.POE_API_KEY),
     proxyApiKey: optionalConfigValue(env.POE_PROXY_API_KEY),
     defaultModel: configValue(env.POE_MODEL, DEFAULT_MODEL),
+    modelMappings: parseModelMappings(env.POE_MODEL_MAPPINGS_JSON),
     host: configValue(env.HOST, DEFAULT_HOST),
     port: configValue(env.PORT, DEFAULT_PORT),
     upstreamTimeoutMs: upstreamTimeoutConfig(env.POE_UPSTREAM_TIMEOUT_MS),
@@ -200,17 +245,7 @@ export function mapStopReason(finishReason) {
   }
 }
 
-export function mapModelName(modelName) {
-  const modelMappings = {
-    "claude-sonnet-4-20250514": "Claude-Sonnet-4",
-    "claude-3-5-sonnet-20241022": "Claude-Sonnet-3.5",
-    "claude-3-5-sonnet-20240620": "Claude-Sonnet-3.5",
-    "claude-3-5-haiku-20241022": "Claude-Haiku-3.5",
-    "claude-3-opus-20240229": "Claude-Opus-3",
-    "claude-3-sonnet-20240229": "Claude-Sonnet-3",
-    "claude-3-haiku-20240307": "Claude-Haiku-3",
-  };
-
+export function mapModelName(modelName, modelMappings = DEFAULT_MODEL_MAPPINGS) {
   return modelMappings[modelName] || modelName;
 }
 
@@ -354,11 +389,15 @@ export function buildPoeTools(tools = []) {
     }));
 }
 
-export function buildPoePayload(payload = {}, defaultModel = DEFAULT_MODEL) {
+export function buildPoePayload(
+  payload = {},
+  defaultModel = DEFAULT_MODEL,
+  modelMappings = DEFAULT_MODEL_MAPPINGS
+) {
   const messages = buildPoeMessages(payload);
   const tools = buildPoeTools(payload.tools || []);
   const poePayload = {
-    model: mapModelName(payload.model || defaultModel),
+    model: mapModelName(payload.model || defaultModel, modelMappings),
     messages,
     max_tokens: payload.max_tokens,
     temperature: payload.temperature !== undefined ? payload.temperature : 1,
@@ -444,6 +483,7 @@ export function createServer({
   apiKey,
   proxyApiKey,
   defaultModel = DEFAULT_MODEL,
+  modelMappings = DEFAULT_MODEL_MAPPINGS,
   fetchImpl = fetch,
   upstreamTimeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS,
   rateLimitMax = DEFAULT_RATE_LIMIT_MAX,
@@ -486,7 +526,7 @@ export function createServer({
         return { error: upstreamKeyError.error };
       }
 
-      const poePayload = buildPoePayload(request.body, defaultModel);
+      const poePayload = buildPoePayload(request.body, defaultModel, modelMappings);
       debugLog(debug, "Poe payload:", poePayload);
 
       const headers = {

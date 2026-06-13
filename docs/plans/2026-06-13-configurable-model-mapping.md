@@ -1,6 +1,6 @@
 # Configurable Model Mapping
 
-status: pending
+status: completed
 
 ## Context
 
@@ -44,8 +44,26 @@ default contract.
 
 ## Work Completed
 
-Pending implementation.
+- Exported the seven frozen default mappings and added bounded parsing for an
+  optional `POE_MODEL_MAPPINGS_JSON` object.
+- Merged safe trimmed overrides over the defaults, preserved unknown-name
+  pass-through behavior, and rejected malformed, oversized, excessive, blank,
+  non-string, and prototype-sensitive entries before startup.
+- Propagated the resolved mapping table through configuration, server creation,
+  and payload translation without changing authentication or transport logic.
+- Documented the defaults, limits, environment example, and credential-safe
+  operational boundary, with static contracts for implementation and evidence.
 
 ## Verification Completed
 
-Pending implementation and validation.
+- Node 20.19.5: all 30 focused tests passed, including custom override route
+  propagation and invalid configuration boundaries.
+- `npm audit --audit-level=moderate` reported zero vulnerabilities.
+- Node 20.19.5 and Node 24.16.0: `make check` passed all 30 tests, syntax/build
+  gates, the portable baseline checker, and the moderate-level audit.
+- Eight focused hostile mutations covering a built-in default, byte and entry
+  limits, merge assignment, route propagation, environment example,
+  documentation, and plan status were rejected.
+- JavaScript and portable shell syntax, `git diff --check`, exact-path,
+  generated-artifact, secret, captured-prompt, and dependency-drift scans
+  passed.
