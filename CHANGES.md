@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-13
+
+- Documented mapped, partially normalized, and ignored Anthropic request fields
+  without changing proxy translation behavior.
+
 ## 2026-06-12
 
 - Added configurable per-client request limiting ahead of authentication and

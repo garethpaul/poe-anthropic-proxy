@@ -35,6 +35,7 @@ for path in \
   "README.md" \
   "SECURITY.md" \
   "VISION.md" \
+  "docs/anthropic-request-field-support.md" \
   "package.json" \
   "package-lock.json" \
   "poe-proxy.js" \
@@ -46,8 +47,58 @@ for path in \
   "docs/plans/2026-06-10-poe-proxy-upstream-timeout.md" \
   "docs/plans/2026-06-12-credential-free-hosted-validation.md" \
   "docs/plans/2026-06-12-proxy-rate-limiting.md" \
+  "docs/plans/2026-06-13-unsupported-anthropic-request-fields.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
+done
+
+for payload_contract in \
+  'model: mapModelName(payload.model || defaultModel)' \
+  'messages,' \
+  'max_tokens: payload.max_tokens' \
+  'temperature: payload.temperature !== undefined ? payload.temperature : 1' \
+  'stream: payload.stream === true' \
+  'if (tools.length > 0) poePayload.tools = tools'; do
+  require_text "poe-proxy.js" "$payload_contract"
+done
+
+for field_contract in \
+  'Mapped Top-Level Fields' \
+  '`model`' \
+  '`system`' \
+  '`messages`' \
+  '`max_tokens`' \
+  '`temperature`' \
+  '`stream`' \
+  '`tools`' \
+  '`metadata`' \
+  '`stop_sequences`' \
+  '`top_p`' \
+  '`top_k`' \
+  '`service_tier`' \
+  '`thinking`' \
+  '`tool_choice`' \
+  'Non-text image and document blocks are not translated' \
+  '`cache_control` metadata' \
+  'Ignored fields are not rejected' \
+  'must not assume Anthropic behavior'; do
+  require_text "docs/anthropic-request-field-support.md" "$field_contract"
+done
+
+for document in "README.md" "SECURITY.md" "VISION.md" "CHANGES.md"; do
+  require_text "$document" "ignored Anthropic request fields"
+done
+
+for evidence in \
+  'status: completed' \
+  'Node 20' \
+  'Node 24' \
+  'make check' \
+  'hostile mutations rejected' \
+  'runtime and test paths had no diff' \
+  'git diff --check' \
+  'secret, captured-prompt, generated-artifact, and dependency-drift scan'; do
+  require_text "docs/plans/2026-06-13-unsupported-anthropic-request-fields.md" "$evidence"
 done
 
 require_text "package.json" '"@fastify/rate-limit": "11.0.0"'
