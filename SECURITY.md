@@ -78,6 +78,13 @@ Dependency updates should come from trusted package managers and should keep loc
 
 ## Safe Research Guidelines
 
+The ignored Anthropic request fields documented in
+[`docs/anthropic-request-field-support.md`](docs/anthropic-request-field-support.md)
+do not gain Anthropic semantics merely because the proxy accepts the request.
+Security-sensitive behavior such as metadata handling, stop conditions,
+thinking controls, tool selection, media blocks, and cache controls requires an
+explicit implementation and deterministic tests before it is relied upon.
+
 Good-faith research is welcome when it stays within these boundaries:
 
 - use only accounts, devices, data, and infrastructure that you own or have explicit permission to test

@@ -1,6 +1,6 @@
 # Unsupported Anthropic Request Fields
 
-status: planned
+status: completed
 
 ## Context
 
@@ -58,3 +58,26 @@ false compatibility assumptions even when deterministic tests remain green.
 - Do not change dependencies, lockfile, workflow, environment defaults, or live
   Poe configuration.
 - Do not claim live Poe or full Anthropic protocol compatibility was tested.
+
+## Work Completed
+
+- Added the request-field support contract and linked it from repository
+  guidance.
+- Extended the baseline checker with implementation-alignment, documentation,
+  and completed-evidence contracts.
+- Kept runtime, test, dependency, workflow, and environment behavior unchanged.
+
+## Verification Completed
+
+- Node 20 and Node 24: `npm ci --ignore-scripts`; `make lint`, `make test`,
+  `make build`, `make audit`, `make verify`, and `make check` passed.
+- `npm audit --audit-level=moderate` reported zero moderate-or-higher
+  vulnerabilities on both runtimes.
+- The baseline checker passed from an external working directory.
+- Package and lockfile JSON, workflow YAML, and the README SVG parsed.
+- 10 hostile mutations rejected mapped, ignored, content-block, no-semantics,
+  implementation-alignment, guidance, status, and evidence drift.
+- The runtime and test paths had no diff.
+- `git diff --check` passed.
+- The secret, captured-prompt, generated-artifact, and dependency-drift scan
+  found no prohibited content or unintended artifacts in the intended paths.
