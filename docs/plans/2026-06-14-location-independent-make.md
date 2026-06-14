@@ -6,7 +6,7 @@ date: 2026-06-14
 
 # Location-Independent Make Gates
 
-status: planned
+status: completed
 
 ## Summary
 
@@ -60,7 +60,7 @@ aliases and dependency ordering intact.
 
 ### U2. Enforce and document the contract
 
-**Files:** `scripts/check-baseline.sh`,
+**Files:** `scripts/check-baseline.sh`, `test/poe-proxy.test.js`,
 `docs/plans/2026-06-14-location-independent-make.md`
 
 Require the exact root declaration and rooted recipes, then record completed
@@ -91,3 +91,27 @@ Completion requires all Make aliases from the repository root, full checks
 through the absolute Makefile path from an external directory, Node 20 and 24
 coverage, isolated hostile mutations for every new static contract, and clean
 diff, artifact, credential, dependency, and protected-path audits.
+
+## Work Completed
+
+- Added an override-protected repository root to the Makefile and rooted lint,
+  test, build, audit, verify, and baseline-checker execution without changing
+  the existing target graph.
+- Extended the portable checker and the dependency-free repository wrapper
+  test to require the root derivation and all six rooted recipes exactly.
+- Preserved runtime sources, dependencies, lockfile, workflow, environment
+  contracts, and proxy behavior.
+
+## Verification Completed
+
+- Node 20.19.5 and Node 24.16.0 passed the 30-test suite, syntax/build checks,
+  and moderate-level audit with zero known vulnerabilities.
+- Both runtimes passed repository-root verification and verification through
+  the absolute Makefile path from /tmp with a hostile `REPO_ROOT=/tmp`
+  override, proving the Makefile retained its own repository root.
+- The checker rejected seven isolated hostile mutations covering root
+  derivation and every rooted recipe after a disposable current-tree baseline
+  passed.
+- Portable shell syntax, `git diff --check`, intended-path, generated-artifact,
+  credential-pattern, dependency-state, and protected runtime/test/workflow
+  preservation checks passed.
