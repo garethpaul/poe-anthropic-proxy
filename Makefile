@@ -1,21 +1,22 @@
 .PHONY: audit build check lint test verify
 
 NPM ?= npm
+override REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 lint:
-	$(NPM) run lint
+	cd "$(REPO_ROOT)" && $(NPM) run lint
 
 test:
-	$(NPM) test
+	cd "$(REPO_ROOT)" && $(NPM) test
 
 build:
-	$(NPM) run build
+	cd "$(REPO_ROOT)" && $(NPM) run build
 
 audit:
-	$(NPM) run audit
+	cd "$(REPO_ROOT)" && $(NPM) run audit
 
 verify:
-	$(NPM) run verify
+	cd "$(REPO_ROOT)" && $(NPM) run verify
 
 check: verify
-	scripts/check-baseline.sh
+	cd "$(REPO_ROOT)" && scripts/check-baseline.sh

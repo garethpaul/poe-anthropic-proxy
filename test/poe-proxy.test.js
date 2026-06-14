@@ -326,10 +326,21 @@ test("repository check wrapper is documented and preserved", () => {
     pkg.scripts.verify,
     "npm run lint && npm test && npm run build && npm run audit"
   );
-  assert.match(makefile, /^lint:\n\t\$\((?:NPM)\) run lint$/m);
-  assert.match(makefile, /^build:\n\t\$\((?:NPM)\) run build$/m);
+  assert.match(
+    makefile,
+    /^override REPO_ROOT := \$\(abspath \$\(dir \$\(lastword \$\(MAKEFILE_LIST\)\)\)\)$/m
+  );
+  for (const recipe of [
+    'cd "$(REPO_ROOT)" && $(NPM) run lint',
+    'cd "$(REPO_ROOT)" && $(NPM) test',
+    'cd "$(REPO_ROOT)" && $(NPM) run build',
+    'cd "$(REPO_ROOT)" && $(NPM) run audit',
+    'cd "$(REPO_ROOT)" && $(NPM) run verify',
+    'cd "$(REPO_ROOT)" && scripts/check-baseline.sh',
+  ]) {
+    assert.ok(makefile.includes(`\t${recipe}\n`), recipe);
+  }
   assert.match(makefile, /^check: verify$/m);
-  assert.match(makefile, /\$\(NPM\) run verify/);
   assert.match(readme, /make lint/);
   assert.match(readme, /make build/);
   assert.match(readme, /npm run lint/);
