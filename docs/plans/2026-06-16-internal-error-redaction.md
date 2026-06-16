@@ -1,6 +1,6 @@
 ---
 title: Internal Proxy Error Redaction
-status: planned
+status: completed
 date: 2026-06-16
 ---
 
@@ -75,4 +75,17 @@ diagnostics to the client.
 
 ## Verification Completed
 
-Pending implementation and bounded verification.
+- The pre-fix probe reproduced an authenticated 500 response containing a
+  private endpoint and embedded credential detail.
+- Focused pre-stream and started-stream redaction regressions passed, and all
+  32 tests passed on the complete suite.
+- Node 20 and Node 24 passed lint, tests, syntax build, dependency audit,
+  baseline contracts, and `make check`.
+- `npm audit --audit-level=moderate` reported zero vulnerabilities.
+- The complete gate passed through the absolute Makefile path from /tmp.
+- Eight isolated hostile mutations were rejected across raw exception
+  reflection, stable response drift, started-stream termination, response and
+  operator diagnostic coverage, guidance, changelog evidence, and completed
+  plan status.
+- `git diff --check`, exact diff, generated dependency and artifact, secret,
+  conflict-marker, binary, and large-file audits passed.

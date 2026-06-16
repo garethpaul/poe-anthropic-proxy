@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-16
+
+- Added internal proxy error redaction so unexpected fetch, mapping, and stream
+  failures return a stable generic 500 response instead of raw diagnostics.
+
 ## 2026-06-13
 
 - Added bounded `POE_MODEL_MAPPINGS_JSON` overrides while preserving and

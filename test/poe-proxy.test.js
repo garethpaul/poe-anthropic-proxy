@@ -825,6 +825,86 @@ test("createServer returns a stable gateway timeout for stalled Poe requests", a
   }
 });
 
+test("createServer redacts unexpected internal errors from clients", async (t) => {
+  const privateDetail =
+    "private endpoint https://user:secret@example.test failed";
+  const loggedErrors = [];
+  t.mock.method(console, "error", (...args) => loggedErrors.push(args));
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => {
+      throw new Error(privateDetail);
+    },
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: { authorization: "Bearer proxy-key" },
+      payload: { messages: [{ role: "user", content: "Hello" }] },
+    });
+
+    assert.equal(response.statusCode, 500);
+    assert.deepEqual(response.json(), { error: "Internal proxy error" });
+    assert.equal(response.body.includes(privateDetail), false);
+    assert.equal(loggedErrors.length, 1);
+    assert.equal(loggedErrors[0][0].message, privateDetail);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer ends failed streams without exposing internal errors", async (t) => {
+  const privateDetail = "private stream diagnostic secret";
+  const encodedEvent = new TextEncoder().encode(
+    'data: {"choices":[{"delta":{"content":"hello"}}]}\n'
+  );
+  let reads = 0;
+  const loggedErrors = [];
+  t.mock.method(console, "error", (...args) => loggedErrors.push(args));
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: async () => {
+            reads += 1;
+            if (reads === 1) return { value: encodedEvent, done: false };
+            throw new Error(privateDetail);
+          },
+        }),
+      },
+    }),
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: { authorization: "Bearer proxy-key" },
+      payload: {
+        stream: true,
+        messages: [{ role: "user", content: "Hello" }],
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /event: message_start/);
+    assert.equal(response.body.includes(privateDetail), false);
+    assert.equal(response.body.includes("Internal proxy error"), false);
+    assert.equal(loggedErrors.length, 1);
+    assert.equal(loggedErrors[0][0].message, privateDetail);
+  } finally {
+    await server.close();
+  }
+});
+
 test("createServer returns upstream Poe error payloads with upstream status", async () => {
   let jsonCalled = false;
   const upstreamError = JSON.stringify({ error: { message: "rate limited" } });
