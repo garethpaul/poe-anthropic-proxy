@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-17
+
+- Added internal proxy log redaction so unexpected failures emit a stable
+  operator marker instead of raw exception details.
+
 ## 2026-06-16
 
 - Added internal proxy error redaction so unexpected fetch, mapping, and stream

@@ -1,6 +1,6 @@
 # Internal Proxy Error Log Redaction
 
-status: planned
+status: completed
 
 ## Problem
 
@@ -70,3 +70,28 @@ regressions, guidance, and completed plan evidence against isolated mutations.
   path without risking credential disclosure.
 - Broader structured observability would require a separate reviewed design.
 - This change is stacked on PR #8, which must remain open and merge first.
+
+## Work Completed
+
+- Added one stable unexpected-failure log marker and replaced raw exception
+  logging in the generic pre-stream and started-stream catch path.
+- Updated both existing internal-error regressions to require the exact marker
+  and prove private exception details are absent from every logged argument.
+- Extended structural contracts and synchronized repository, security, vision,
+  and changelog guidance.
+
+## Verification Completed
+
+- `node --test --test-name-pattern="internal errors" test/poe-proxy.test.js`
+  passed both focused error paths.
+- The complete 32-test suite, `npm run verify`, and every Make alias passed on
+  Node 20.19.5 and Node 24.16.0.
+- Fresh `npm ci --ignore-scripts` installs and
+  `npm audit --audit-level=moderate` completed with zero vulnerabilities.
+- The absolute Makefile gate passed from an external working directory.
+- Six isolated hostile mutations were rejected: stable marker, raw exception
+  logging, pre-stream regression, streaming regression, guidance, and completed
+  plan status.
+- `git diff --check` plus generated dependency/artifact, secret,
+  conflict-marker, binary, size, and mode audits passed.
+- No live Poe request or real credential was used.

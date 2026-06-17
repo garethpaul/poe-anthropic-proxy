@@ -19,6 +19,7 @@ const MAX_RATE_LIMIT_WINDOW_MS = 3_600_000;
 const MAX_MODEL_MAPPINGS_BYTES = 16_384;
 const MAX_MODEL_MAPPINGS_ENTRIES = 100;
 const INTERNAL_PROXY_ERROR = "Internal proxy error";
+const INTERNAL_PROXY_LOG = "Unexpected internal proxy failure";
 const POE_TOOL_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 export const DEFAULT_MODEL_MAPPINGS = Object.freeze({
   "claude-sonnet-4-20250514": "Claude-Sonnet-4",
@@ -757,7 +758,7 @@ export function createServer({
         reply.code(504);
         return { error: "Poe upstream request timed out" };
       }
-      console.error(err);
+      console.error(INTERNAL_PROXY_LOG);
       if (reply.raw.headersSent) {
         reply.raw.end();
         return;

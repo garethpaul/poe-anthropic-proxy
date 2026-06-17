@@ -850,8 +850,8 @@ test("createServer redacts unexpected internal errors from clients", async (t) =
     assert.equal(response.statusCode, 500);
     assert.deepEqual(response.json(), { error: "Internal proxy error" });
     assert.equal(response.body.includes(privateDetail), false);
-    assert.equal(loggedErrors.length, 1);
-    assert.equal(loggedErrors[0][0].message, privateDetail);
+    assert.deepEqual(loggedErrors, [["Unexpected internal proxy failure"]]);
+    assert.equal(JSON.stringify(loggedErrors).includes(privateDetail), false);
   } finally {
     await server.close();
   }
@@ -898,8 +898,8 @@ test("createServer ends failed streams without exposing internal errors", async 
     assert.match(response.body, /event: message_start/);
     assert.equal(response.body.includes(privateDetail), false);
     assert.equal(response.body.includes("Internal proxy error"), false);
-    assert.equal(loggedErrors.length, 1);
-    assert.equal(loggedErrors[0][0].message, privateDetail);
+    assert.deepEqual(loggedErrors, [["Unexpected internal proxy failure"]]);
+    assert.equal(JSON.stringify(loggedErrors).includes(privateDetail), false);
   } finally {
     await server.close();
   }

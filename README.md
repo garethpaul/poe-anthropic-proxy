@@ -94,6 +94,8 @@ Built-in mappings:
   status fallback when Poe sends an empty error body.
 - Unexpected internal proxy failures return a stable generic 500 response
   instead of exposing fetch, mapping, or stream exception details.
+- Unexpected internal proxy logs use a stable marker without exception details
+  so collected logs do not retain credential-bearing runtime messages.
 - Malformed Poe tool call arguments are rejected with an explicit local mapping
   error before Anthropic tool-use content is returned.
 - Malformed Poe tool definitions are ignored before forwarding so bad request
