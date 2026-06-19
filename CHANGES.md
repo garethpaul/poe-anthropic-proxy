@@ -1,5 +1,17 @@
 # Changes
 
+## 2026-06-18
+
+- Restricted configurable model lookups to explicit mapping entries so model
+  names matching inherited object properties remain valid upstream model names.
+- Preserved each OpenAI-compatible streamed tool argument delta instead of
+  treating later fragments as cumulative replacements.
+
+## 2026-06-17
+
+- Added internal proxy log redaction so unexpected failures emit a stable
+  operator marker instead of raw exception details.
+
 ## 2026-06-16
 
 - Added internal proxy error redaction so unexpected fetch, mapping, and stream

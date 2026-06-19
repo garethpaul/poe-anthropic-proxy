@@ -94,6 +94,8 @@ Built-in mappings:
   status fallback when Poe sends an empty error body.
 - Unexpected internal proxy failures return a stable generic 500 response
   instead of exposing fetch, mapping, or stream exception details.
+- Unexpected internal proxy logs use a stable marker without exception details
+  so collected logs do not retain credential-bearing runtime messages.
 - Malformed Poe tool call arguments are rejected with an explicit local mapping
   error before Anthropic tool-use content is returned.
 - Malformed Poe tool definitions are ignored before forwarding so bad request
@@ -170,6 +172,10 @@ rejected and must not be treated as compatibility guarantees.
   mapping, and empty error bodies get a status-based fallback message.
 - Poe stream chunk boundaries are reconstructed before JSON parsing, including
   split multibyte text and a final line without a trailing newline.
+- Streamed tool call argument fragments are forwarded as deltas and preserve
+  their original order for Anthropic clients.
+- Model mappings apply only to explicit entries; inherited JavaScript object
+  properties remain ordinary upstream model names.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
   of leaking generic JSON parse failures.
 - Malformed Poe tool definitions are ignored before forwarding instead of

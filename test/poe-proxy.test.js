@@ -246,6 +246,25 @@ test("custom model mappings override visible defaults and reject invalid config"
   );
 });
 
+test("model mapping ignores inherited object properties", () => {
+  const modelMappings = parseModelMappings("{}");
+
+  for (const modelName of [
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+    "constructor",
+    "__proto__",
+  ]) {
+    assert.equal(mapModelName(modelName, modelMappings), modelName);
+    assert.equal(
+      buildPoePayload({ model: modelName, messages: [] }, undefined, modelMappings)
+        .model,
+      modelName
+    );
+  }
+});
+
 test("loadConfig binds localhost by default and reads proxy auth", () => {
   const config = loadConfig({
     POE_API_KEY: "poe-key",
@@ -782,6 +801,55 @@ test("createServer preserves streamed SSE data split across byte chunks", async 
   }
 });
 
+test("createServer preserves streamed tool argument delta fragments", async () => {
+  const encoded = new TextEncoder().encode(
+    [
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"weather","arguments":"{\\"city\\""}}]}}]}',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":":\\"Paris\\"}"}}]}}]}',
+      "data: [DONE]",
+    ].join("\n\n")
+  );
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoded);
+          controller.close();
+        },
+      }),
+    }),
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: { authorization: "Bearer proxy-key" },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+        stream: true,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    const argumentDeltas = response.body
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)))
+      .filter((event) => event.type === "content_block_delta")
+      .map((event) => event.delta.partial_json);
+    assert.deepEqual(argumentDeltas, ['{"city"', ':"Paris"}']);
+    assert.equal(argumentDeltas.join(""), '{"city":"Paris"}');
+    assert.match(response.body, /event: message_stop/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("createServer returns a stable gateway timeout for stalled Poe requests", async () => {
   let capturedSignal;
   const loggedErrors = [];
@@ -850,8 +918,8 @@ test("createServer redacts unexpected internal errors from clients", async (t) =
     assert.equal(response.statusCode, 500);
     assert.deepEqual(response.json(), { error: "Internal proxy error" });
     assert.equal(response.body.includes(privateDetail), false);
-    assert.equal(loggedErrors.length, 1);
-    assert.equal(loggedErrors[0][0].message, privateDetail);
+    assert.deepEqual(loggedErrors, [["Unexpected internal proxy failure"]]);
+    assert.equal(JSON.stringify(loggedErrors).includes(privateDetail), false);
   } finally {
     await server.close();
   }
@@ -898,8 +966,8 @@ test("createServer ends failed streams without exposing internal errors", async 
     assert.match(response.body, /event: message_start/);
     assert.equal(response.body.includes(privateDetail), false);
     assert.equal(response.body.includes("Internal proxy error"), false);
-    assert.equal(loggedErrors.length, 1);
-    assert.equal(loggedErrors[0][0].message, privateDetail);
+    assert.deepEqual(loggedErrors, [["Unexpected internal proxy failure"]]);
+    assert.equal(JSON.stringify(loggedErrors).includes(privateDetail), false);
   } finally {
     await server.close();
   }

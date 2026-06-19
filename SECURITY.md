@@ -64,7 +64,8 @@ clients cannot consume unbounded request or Poe capacity.
 Timeout responses and logs should use stable text rather than raw runtime error
 details.
 Unexpected internal proxy failures must not return raw exception details to
-callers; detailed diagnostics belong only on the server-side operator path.
+callers. Unexpected internal exception details must not enter application logs;
+operators receive only a stable failure marker.
 Poe stream chunk boundaries must be buffered before JSON parsing so ordinary
 network segmentation cannot silently remove translated response content.
 
