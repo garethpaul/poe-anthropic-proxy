@@ -230,11 +230,18 @@ test("loadConfig binds localhost by default and reads proxy auth", () => {
   assert.equal(config.host, "127.0.0.1");
   assert.equal(config.proxyApiKey, "proxy-key");
   assert.equal(config.upstreamTimeoutMs, 30000);
+  assert.equal(config.rateLimitMax, 60);
+  assert.equal(config.rateLimitWindowMs, 60000);
   assert.equal(loadConfig({ HOST: "0.0.0.0" }).host, "0.0.0.0");
   assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: " 5000 " }).upstreamTimeoutMs, 5000);
   assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: "invalid" }).upstreamTimeoutMs, 30000);
   assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: "0" }).upstreamTimeoutMs, 30000);
   assert.equal(loadConfig({ POE_UPSTREAM_TIMEOUT_MS: "300001" }).upstreamTimeoutMs, 30000);
+  assert.equal(loadConfig({ POE_RATE_LIMIT_MAX: " 120 " }).rateLimitMax, 120);
+  assert.equal(loadConfig({ POE_RATE_LIMIT_MAX: "0" }).rateLimitMax, 60);
+  assert.equal(loadConfig({ POE_RATE_LIMIT_MAX: "10001" }).rateLimitMax, 60);
+  assert.equal(loadConfig({ POE_RATE_LIMIT_WINDOW_MS: " 5000 " }).rateLimitWindowMs, 5000);
+  assert.equal(loadConfig({ POE_RATE_LIMIT_WINDOW_MS: "3600001" }).rateLimitWindowMs, 60000);
 });
 
 test("loadConfig trims environment values and ignores blank credentials", () => {
@@ -263,6 +270,8 @@ test(".env.example documents required proxy credentials", () => {
     "POE_BASE_URL",
     "POE_MODEL",
     "POE_UPSTREAM_TIMEOUT_MS",
+    "POE_RATE_LIMIT_MAX",
+    "POE_RATE_LIMIT_WINDOW_MS",
     "HOST",
     "PORT",
   ]) {
@@ -637,6 +646,52 @@ test("createServer handles non-streaming requests with injected fetch", async ()
     assert.deepEqual(response.json().content, [
       { text: "Hello from Poe", type: "text" },
     ]);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer rate limits requests before additional upstream work", async () => {
+  let fetchCalls = 0;
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    rateLimitMax: 1,
+    rateLimitWindowMs: 60_000,
+    logger: false,
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [
+              {
+                finish_reason: "stop",
+                message: { role: "assistant", content: "first response" },
+              },
+            ],
+          };
+        },
+      };
+    },
+  });
+
+  const request = {
+    method: "POST",
+    url: "/v1/messages",
+    headers: { authorization: "Bearer proxy-key" },
+    payload: { messages: [{ role: "user", content: "Hello" }] },
+  };
+
+  try {
+    const first = await server.inject(request);
+    const limited = await server.inject(request);
+
+    assert.equal(first.statusCode, 200);
+    assert.equal(limited.statusCode, 429);
+    assert.equal(limited.headers["retry-after"], "60");
+    assert.equal(fetchCalls, 1);
   } finally {
     await server.close();
   }
