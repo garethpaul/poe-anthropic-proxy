@@ -125,6 +125,12 @@ When the required SDK or runtime is unavailable, use static checks and source re
 
 ## Configuration and Secrets
 
+The proxy implements a focused subset of Anthropic request semantics. See the
+ignored Anthropic request fields contract in
+[`docs/anthropic-request-field-support.md`](docs/anthropic-request-field-support.md)
+for mapped, partially normalized, and ignored fields. Ignored fields are not
+rejected and must not be treated as compatibility guarantees.
+
 - Detected references to OpenAI. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
 - `POE_API_KEY` is the upstream Poe credential and must stay server-side.
 - `POE_PROXY_API_KEY` is the inbound caller token required by `/v1/messages`.

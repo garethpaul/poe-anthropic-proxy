@@ -36,12 +36,13 @@ Priority:
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests
 - Keep Poe tool names and schemas validated before upstream forwarding
+- Keep mapped, partially normalized, and ignored Anthropic request fields
+  explicit and aligned with the translation implementation
 - Keep GitHub Actions aligned with the no-live-credentials `make check` gate
 - Keep hosted checkout credential-free and isolate tests from the live Poe URL
 
 Next priorities:
 
-- Document unsupported Anthropic request fields
 - Keep model mapping configurable without hiding defaults
 - Keep environment normalization covered as deployment options evolve
 - Add live-verification notes that never print API keys
