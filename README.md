@@ -54,6 +54,23 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 ## Running or Using the Project
 
+`POE_MODEL` sets the default model when a request omits `model`.
+`POE_MODEL_MAPPINGS_JSON` optionally supplies model mapping overrides as a JSON object of Anthropic model
+names to Poe bot names. Valid entries override the built-in mappings; unknown
+names still pass through unchanged. Configuration is limited to 16,384 bytes
+and 100 safe nonempty string pairs, and malformed values stop startup without
+printing mapping contents.
+
+Built-in mappings:
+
+- `claude-sonnet-4-20250514` -> `Claude-Sonnet-4`
+- `claude-3-5-sonnet-20241022` -> `Claude-Sonnet-3.5`
+- `claude-3-5-sonnet-20240620` -> `Claude-Sonnet-3.5`
+- `claude-3-5-haiku-20241022` -> `Claude-Haiku-3.5`
+- `claude-3-opus-20240229` -> `Claude-Opus-3`
+- `claude-3-sonnet-20240229` -> `Claude-Sonnet-3`
+- `claude-3-haiku-20240307` -> `Claude-Haiku-3`
+
 - Run `npm start` for the default development command.
 - Run `npm run dev` for the development server when that script is appropriate.
 - The server binds to `127.0.0.1` by default. Set `HOST` explicitly only when

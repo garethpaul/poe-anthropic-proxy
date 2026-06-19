@@ -48,18 +48,37 @@ for path in \
   "docs/plans/2026-06-12-credential-free-hosted-validation.md" \
   "docs/plans/2026-06-12-proxy-rate-limiting.md" \
   "docs/plans/2026-06-13-unsupported-anthropic-request-fields.md" \
+  "docs/plans/2026-06-13-configurable-model-mapping.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
 done
 
 for payload_contract in \
-  'model: mapModelName(payload.model || defaultModel)' \
+  'model: mapModelName(payload.model || defaultModel, modelMappings)' \
   'messages,' \
   'max_tokens: payload.max_tokens' \
   'temperature: payload.temperature !== undefined ? payload.temperature : 1' \
   'stream: payload.stream === true' \
   'if (tools.length > 0) poePayload.tools = tools'; do
   require_text "poe-proxy.js" "$payload_contract"
+done
+
+for mapping_contract in \
+  'export const DEFAULT_MODEL_MAPPINGS = Object.freeze({' \
+  'export function parseModelMappings(value)' \
+  'const MAX_MODEL_MAPPINGS_BYTES = 16_384;' \
+  'const MAX_MODEL_MAPPINGS_ENTRIES = 100;' \
+  'modelMappings: parseModelMappings(env.POE_MODEL_MAPPINGS_JSON)' \
+  'mappings[name] = target' \
+  '"claude-sonnet-4-20250514": "Claude-Sonnet-4"' \
+  '"claude-3-5-sonnet-20241022": "Claude-Sonnet-3.5"' \
+  '"claude-3-5-sonnet-20240620": "Claude-Sonnet-3.5"' \
+  '"claude-3-5-haiku-20241022": "Claude-Haiku-3.5"' \
+  '"claude-3-opus-20240229": "Claude-Opus-3"' \
+  '"claude-3-sonnet-20240229": "Claude-Sonnet-3"' \
+  '"claude-3-haiku-20240307": "Claude-Haiku-3"' \
+  'buildPoePayload(request.body, defaultModel, modelMappings)'; do
+  require_text "poe-proxy.js" "$mapping_contract"
 done
 
 for field_contract in \
@@ -87,6 +106,7 @@ done
 
 for document in "README.md" "SECURITY.md" "VISION.md" "CHANGES.md"; do
   require_text "$document" "ignored Anthropic request fields"
+  require_text "$document" "model mapping"
 done
 
 for evidence in \
@@ -99,6 +119,16 @@ for evidence in \
   'git diff --check' \
   'secret, captured-prompt, generated-artifact, and dependency-drift scan'; do
   require_text "docs/plans/2026-06-13-unsupported-anthropic-request-fields.md" "$evidence"
+done
+
+for evidence in \
+  'status: completed' \
+  'Node 20' \
+  'Node 24' \
+  'npm audit --audit-level=moderate' \
+  'hostile mutations' \
+  'git diff --check'; do
+  require_text "docs/plans/2026-06-13-configurable-model-mapping.md" "$evidence"
 done
 
 require_text "package.json" '"@fastify/rate-limit": "11.0.0"'
@@ -139,13 +169,22 @@ EOF
 
 for environment_contract in \
   'POE_RATE_LIMIT_MAX=60' \
-  'POE_RATE_LIMIT_WINDOW_MS=60000'; do
+  'POE_RATE_LIMIT_WINDOW_MS=60000' \
+  'POE_MODEL_MAPPINGS_JSON={}'; do
   require_text ".env.example" "$environment_contract"
 done
 for test_contract in \
   'createServer rate limits requests before additional upstream work' \
   'assert.equal(limited.statusCode, 429)' \
   'assert.equal(fetchCalls, 1)'; do
+  require_text "test/poe-proxy.test.js" "$test_contract"
+done
+for test_contract in \
+  'custom model mappings override visible defaults and reject invalid config' \
+  'Private-Sonnet' \
+  'exceeds 16384 bytes' \
+  'exceeds 100 entries' \
+  'model: "Private-Sonnet"'; do
   require_text "test/poe-proxy.test.js" "$test_contract"
 done
 
