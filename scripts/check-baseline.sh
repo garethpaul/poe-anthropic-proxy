@@ -49,6 +49,7 @@ for path in \
   "docs/plans/2026-06-12-proxy-rate-limiting.md" \
   "docs/plans/2026-06-13-unsupported-anthropic-request-fields.md" \
   "docs/plans/2026-06-13-configurable-model-mapping.md" \
+  "docs/plans/2026-06-14-location-independent-make.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
 done
@@ -129,6 +130,18 @@ for evidence in \
   'hostile mutations' \
   'git diff --check'; do
   require_text "docs/plans/2026-06-13-configurable-model-mapping.md" "$evidence"
+done
+
+for evidence in \
+  'status: completed' \
+  'Node 20.19.5' \
+  'Node 24.16.0' \
+  'absolute Makefile path from /tmp' \
+  'REPO_ROOT=/tmp' \
+  'seven isolated hostile mutations' \
+  'git diff --check' \
+  'credential-pattern'; do
+  require_text "docs/plans/2026-06-14-location-independent-make.md" "$evidence"
 done
 
 require_text "package.json" '"@fastify/rate-limit": "11.0.0"'
@@ -229,14 +242,23 @@ if [ "$actual_workflow" != "$expected_workflow" ]; then
   exit 1
 fi
 
-if ! grep -Fq "scripts/check-baseline.sh" "$MAKEFILE"; then
-  printf '%s\n' "Makefile must run scripts/check-baseline.sh from make check." >&2
-  exit 1
-fi
-
 for target in "lint:" "test:" "build:" "audit:" "verify:" "check:"; do
   if ! grep -Fq "$target" "$MAKEFILE"; then
     printf '%s\n' "Makefile must expose the $target gate." >&2
+    exit 1
+  fi
+done
+
+for make_contract in \
+  'override REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))' \
+  'cd "$(REPO_ROOT)" && $(NPM) run lint' \
+  'cd "$(REPO_ROOT)" && $(NPM) test' \
+  'cd "$(REPO_ROOT)" && $(NPM) run build' \
+  'cd "$(REPO_ROOT)" && $(NPM) run audit' \
+  'cd "$(REPO_ROOT)" && $(NPM) run verify' \
+  'cd "$(REPO_ROOT)" && scripts/check-baseline.sh'; do
+  if ! grep -Fq "$make_contract" "$MAKEFILE"; then
+    printf '%s\n' "Makefile must remain caller-directory independent: $make_contract" >&2
     exit 1
   fi
 done
