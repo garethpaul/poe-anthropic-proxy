@@ -172,6 +172,10 @@ rejected and must not be treated as compatibility guarantees.
   mapping, and empty error bodies get a status-based fallback message.
 - Poe stream chunk boundaries are reconstructed before JSON parsing, including
   split multibyte text and a final line without a trailing newline.
+- Streamed tool call argument fragments are forwarded as deltas and preserve
+  their original order for Anthropic clients.
+- Model mappings apply only to explicit entries; inherited JavaScript object
+  properties remain ordinary upstream model names.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
   of leaking generic JSON parse failures.
 - Malformed Poe tool definitions are ignored before forwarding instead of

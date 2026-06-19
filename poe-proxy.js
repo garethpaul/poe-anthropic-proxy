@@ -248,7 +248,9 @@ export function mapStopReason(finishReason) {
 }
 
 export function mapModelName(modelName, modelMappings = DEFAULT_MODEL_MAPPINGS) {
-  return modelMappings[modelName] || modelName;
+  return Object.hasOwn(modelMappings, modelName)
+    ? modelMappings[modelName]
+    : modelName;
 }
 
 export function normalizeContent(content) {
@@ -596,7 +598,7 @@ export function createServer({
       let usage = null;
       let textBlockStarted = false;
       let encounteredToolCall = false;
-      const toolCallAccumulators = {};
+      const toolCallIndexes = new Set();
       const lineDecoder = createSseLineDecoder();
       const reader = poeResponse.body.getReader();
       let done = false;
@@ -620,10 +622,10 @@ export function createServer({
           const dataStr = trimmed.replace(/^data:\s*/, "");
           if (dataStr === "[DONE]") {
             if (encounteredToolCall) {
-              for (const idx in toolCallAccumulators) {
+              for (const idx of toolCallIndexes) {
                 sendSSE(reply, "content_block_stop", {
                   type: "content_block_stop",
-                  index: parseInt(idx, 10),
+                  index: idx,
                 });
               }
             } else if (textBlockStarted) {
@@ -673,8 +675,8 @@ export function createServer({
               encounteredToolCall = true;
               const idx = toolCall.index;
               const functionDelta = toolCall.function || {};
-              if (toolCallAccumulators[idx] === undefined) {
-                toolCallAccumulators[idx] = "";
+              if (!toolCallIndexes.has(idx)) {
+                toolCallIndexes.add(idx);
                 sendSSE(reply, "content_block_start", {
                   type: "content_block_start",
                   index: idx,
@@ -686,19 +688,16 @@ export function createServer({
                   },
                 });
               }
-              const newArgs = functionDelta.arguments || "";
-              const oldArgs = toolCallAccumulators[idx];
-              if (newArgs.length > oldArgs.length) {
-                const deltaText = newArgs.substring(oldArgs.length);
+              const argumentDelta = functionDelta.arguments || "";
+              if (argumentDelta) {
                 sendSSE(reply, "content_block_delta", {
                   type: "content_block_delta",
                   index: idx,
                   delta: {
                     type: "input_json_delta",
-                    partial_json: deltaText,
+                    partial_json: argumentDelta,
                   },
                 });
-                toolCallAccumulators[idx] = newArgs;
               }
             }
           } else if (delta && delta.content) {
