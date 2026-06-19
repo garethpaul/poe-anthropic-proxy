@@ -32,6 +32,7 @@ Priority:
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep upstream error payloads covered by deterministic route tests
 - Keep the upstream request timeout configurable and covered by route tests
+- Keep unexpected internal proxy diagnostics out of client responses
 - Keep per-client request limiting ahead of authentication and upstream work
 - Keep malformed tool arguments covered by deterministic tests
 - Keep malformed tool definitions covered by deterministic tests

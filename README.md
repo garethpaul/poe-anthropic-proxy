@@ -92,6 +92,8 @@ Built-in mappings:
   error before response mapping continues.
 - Upstream Poe error payloads keep the upstream status code and return a local
   status fallback when Poe sends an empty error body.
+- Unexpected internal proxy failures return a stable generic 500 response
+  instead of exposing fetch, mapping, or stream exception details.
 - Malformed Poe tool call arguments are rejected with an explicit local mapping
   error before Anthropic tool-use content is returned.
 - Malformed Poe tool definitions are ignored before forwarding so bad request

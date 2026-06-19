@@ -50,8 +50,56 @@ for path in \
   "docs/plans/2026-06-13-unsupported-anthropic-request-fields.md" \
   "docs/plans/2026-06-13-configurable-model-mapping.md" \
   "docs/plans/2026-06-14-location-independent-make.md" \
+  "docs/plans/2026-06-16-internal-error-redaction.md" \
   "scripts/check-baseline.sh"; do
   require_file "$path"
+done
+
+for internal_error_contract in \
+  'const INTERNAL_PROXY_ERROR = "Internal proxy error";' \
+  'return { error: INTERNAL_PROXY_ERROR };'; do
+  require_text "poe-proxy.js" "$internal_error_contract"
+done
+
+if grep -Fq 'return { error: err.message };' "$ROOT_DIR/poe-proxy.js"; then
+  printf '%s\n' "generic proxy failures must not return raw exception messages" >&2
+  exit 1
+fi
+
+for test_contract in \
+  'createServer redacts unexpected internal errors from clients' \
+  'createServer ends failed streams without exposing internal errors' \
+  'private endpoint https://user:secret@example.test failed' \
+  'private stream diagnostic secret' \
+  'assert.deepEqual(response.json(), { error: "Internal proxy error" })' \
+  'assert.equal(response.body.includes(privateDetail), false)' \
+  'assert.equal(response.body.includes("Internal proxy error"), false)' \
+  'assert.equal(loggedErrors[0][0].message, privateDetail)'; do
+  require_text "test/poe-proxy.test.js" "$test_contract"
+done
+
+for document_contract in \
+  'Unexpected internal proxy failures return a stable generic 500 response' \
+  'Unexpected internal proxy failures must not return raw exception details' \
+  'Keep unexpected internal proxy diagnostics out of client responses' \
+  'internal proxy error redaction'; do
+  case "$document_contract" in
+    Unexpected\ internal\ proxy\ failures\ return*) document="README.md" ;;
+    Unexpected\ internal\ proxy\ failures\ must*) document="SECURITY.md" ;;
+    Keep\ unexpected*) document="VISION.md" ;;
+    *) document="CHANGES.md" ;;
+  esac
+  require_text "$document" "$document_contract"
+done
+
+for evidence in \
+  'status: completed' \
+  '32 tests passed' \
+  'npm audit --audit-level=moderate' \
+  'absolute Makefile path from /tmp' \
+  'hostile mutations were rejected' \
+  'git diff --check'; do
+  require_text "docs/plans/2026-06-16-internal-error-redaction.md" "$evidence"
 done
 
 for payload_contract in \
@@ -158,13 +206,15 @@ for implementation_contract in \
   require_text "poe-proxy.js" "$implementation_contract"
 done
 
-node --input-type=module - "$ROOT_DIR/poe-proxy.js" <<'EOF'
+node --input-type=module - "$ROOT_DIR/poe-proxy.js" "$ROOT_DIR/test/poe-proxy.test.js" <<'EOF'
 import { readFileSync } from "node:fs";
 
 const source = readFileSync(process.argv[2], "utf8");
+const tests = readFileSync(process.argv[3], "utf8");
 const registrationIndex = source.indexOf("fastify.register(rateLimit");
 const routePattern = /fastify\.post\(\s*["']\/v1\/messages["']\s*,\s*\{\s*config\s*:\s*\{\s*rateLimit\s*:\s*\{\s*max\s*:\s*requestRateLimitMax\s*,\s*timeWindow\s*:\s*requestRateLimitWindowMs\s*,?\s*\}\s*,?\s*\}\s*,?\s*\}\s*,\s*handleMessages\s*\)/;
 const routeMatch = routePattern.exec(source);
+const genericErrorPattern = /console\.error\(err\);\s*if \(reply\.raw\.headersSent\) \{\s*reply\.raw\.end\(\);\s*return;\s*\}\s*reply\.code\(500\);\s*return \{ error: INTERNAL_PROXY_ERROR \};/;
 
 if (!routeMatch) {
   console.error(
@@ -176,6 +226,54 @@ if (!routeMatch) {
 
 if (registrationIndex === -1 || registrationIndex > routeMatch.index) {
   console.error("@fastify/rate-limit must be registered before /v1/messages is installed.");
+  process.exit(1);
+}
+
+if (!genericErrorPattern.test(source)) {
+  console.error(
+    "generic proxy failures must terminate started streams before returning the stable 500 payload."
+  );
+  process.exit(1);
+}
+
+function testBody(name) {
+  const start = tests.indexOf(`test("${name}"`);
+  if (start === -1) return "";
+  const next = tests.indexOf("\ntest(\"", start + 1);
+  return tests.slice(start, next === -1 ? tests.length : next);
+}
+
+const responseRedactionTest = testBody(
+  "createServer redacts unexpected internal errors from clients"
+);
+if (
+  !responseRedactionTest.includes(
+    'assert.deepEqual(response.json(), { error: "Internal proxy error" })'
+  ) ||
+  !responseRedactionTest.includes(
+    "assert.equal(response.body.includes(privateDetail), false)"
+  ) ||
+  !responseRedactionTest.includes(
+    "assert.equal(loggedErrors[0][0].message, privateDetail)"
+  )
+) {
+  console.error("the pre-stream regression must prove response redaction and operator diagnostics.");
+  process.exit(1);
+}
+
+const streamRedactionTest = testBody(
+  "createServer ends failed streams without exposing internal errors"
+);
+if (
+  !streamRedactionTest.includes("assert.equal(response.statusCode, 200)") ||
+  !streamRedactionTest.includes(
+    "assert.equal(response.body.includes(privateDetail), false)"
+  ) ||
+  !streamRedactionTest.includes(
+    'assert.equal(response.body.includes("Internal proxy error"), false)'
+  )
+) {
+  console.error("the started-stream regression must prove clean termination without error detail.");
   process.exit(1);
 }
 EOF

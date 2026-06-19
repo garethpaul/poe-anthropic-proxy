@@ -63,6 +63,8 @@ Rate limiting must run before proxy authorization and upstream work so abusive
 clients cannot consume unbounded request or Poe capacity.
 Timeout responses and logs should use stable text rather than raw runtime error
 details.
+Unexpected internal proxy failures must not return raw exception details to
+callers; detailed diagnostics belong only on the server-side operator path.
 Poe stream chunk boundaries must be buffered before JSON parsing so ordinary
 network segmentation cannot silently remove translated response content.
 
