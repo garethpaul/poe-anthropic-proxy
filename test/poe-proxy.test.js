@@ -351,15 +351,17 @@ test("repository check wrapper is documented and preserved", () => {
   );
   assert.match(makefile, /^\$\(error MAKEFILE_LIST must not be overridden\)$/m);
   assert.match(makefile, /^override REPO_ROOT := \$\(shell path=/m);
+  assert.match(makefile, /^export REPO_ROOT$/m);
   assert.match(makefile, /^override NPM := npm$/m);
+  assert.match(makefile, /^override NODE := node$/m);
   for (const recipe of [
-    'cd "$(REPO_ROOT)" && node scripts/test-makefile-root.js',
-    'cd "$(REPO_ROOT)" && $(NPM) run lint',
-    'cd "$(REPO_ROOT)" && $(NPM) test',
-    'cd "$(REPO_ROOT)" && $(NPM) run build',
-    'cd "$(REPO_ROOT)" && $(NPM) run audit',
-    'cd "$(REPO_ROOT)" && $(NPM) run verify',
-    'cd "$(REPO_ROOT)" && scripts/check-baseline.sh',
+    'cd "$$REPO_ROOT" && $(NODE) scripts/test-makefile-root.js',
+    'cd "$$REPO_ROOT" && $(NPM) run lint',
+    'cd "$$REPO_ROOT" && $(NPM) test',
+    'cd "$$REPO_ROOT" && $(NPM) run build',
+    'cd "$$REPO_ROOT" && $(NPM) run audit',
+    'cd "$$REPO_ROOT" && $(NPM) run verify',
+    'cd "$$REPO_ROOT" && scripts/check-baseline.sh',
   ]) {
     assert.ok(makefile.includes(`\t${recipe}\n`), recipe);
   }
