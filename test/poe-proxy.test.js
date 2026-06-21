@@ -347,9 +347,13 @@ test("repository check wrapper is documented and preserved", () => {
   );
   assert.match(
     makefile,
-    /^override REPO_ROOT := \$\(abspath \$\(dir \$\(lastword \$\(MAKEFILE_LIST\)\)\)\)$/m
+    /^ifneq \(\$\(origin MAKEFILE_LIST\),file\)$/m
   );
+  assert.match(makefile, /^\$\(error MAKEFILE_LIST must not be overridden\)$/m);
+  assert.match(makefile, /^override REPO_ROOT := \$\(shell path=/m);
+  assert.match(makefile, /^override NPM := npm$/m);
   for (const recipe of [
+    'cd "$(REPO_ROOT)" && node scripts/test-makefile-root.js',
     'cd "$(REPO_ROOT)" && $(NPM) run lint',
     'cd "$(REPO_ROOT)" && $(NPM) test',
     'cd "$(REPO_ROOT)" && $(NPM) run build',
@@ -360,6 +364,7 @@ test("repository check wrapper is documented and preserved", () => {
     assert.ok(makefile.includes(`\t${recipe}\n`), recipe);
   }
   assert.match(makefile, /^check: verify$/m);
+  assert.match(makefile, /^verify: root-test$/m);
   assert.match(readme, /make lint/);
   assert.match(readme, /make build/);
   assert.match(readme, /npm run lint/);

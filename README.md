@@ -136,6 +136,11 @@ scripts/check-baseline.sh
 deterministic Node tests, the build alias, and `npm audit --audit-level=moderate`.
 It then runs `scripts/check-baseline.sh` to verify package script wiring,
 completed plan metadata, credential documentation, and local metadata ignores.
+Make derives a canonical root from the checked-in Makefile, rejects caller
+replacement of `MAKEFILE_LIST`, and ignores command-line or environment
+`REPO_ROOT` and `NPM` redirection. Absolute `-f` paths remain supported from
+unrelated working directories, including checkout paths with spaces and
+apostrophes.
 The tests do not require a live Poe API key or network access.
 GitHub Actions installs dependencies with `npm ci` on Node 20 and Node 24 and
 runs the same `make check` gate without live Poe credentials. Checkout does not

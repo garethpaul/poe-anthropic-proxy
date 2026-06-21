@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-06-21
+
+- Made every Make quality gate derive a canonical root from the checked-in
+  Makefile, reject `MAKEFILE_LIST` replacement, and ignore caller-controlled
+  `REPO_ROOT` and `NPM` values.
+- Added dependency-free regression coverage for all seven public Make targets
+  from external checkout paths containing spaces and apostrophes.
+
 ## 2026-06-18
 
 - Restricted configurable model lookups to explicit mapping entries so model

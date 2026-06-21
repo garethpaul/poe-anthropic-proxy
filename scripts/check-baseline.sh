@@ -52,7 +52,9 @@ for path in \
   "docs/plans/2026-06-14-location-independent-make.md" \
   "docs/plans/2026-06-16-internal-error-redaction.md" \
   "docs/plans/2026-06-17-internal-error-log-redaction.md" \
-  "scripts/check-baseline.sh"; do
+  "docs/plans/2026-06-21-safe-make-root.md" \
+  "scripts/check-baseline.sh" \
+  "scripts/test-makefile-root.js"; do
   require_file "$path"
 done
 
@@ -388,7 +390,7 @@ if [ "$actual_workflow" != "$expected_workflow" ]; then
   exit 1
 fi
 
-for target in "lint:" "test:" "build:" "audit:" "verify:" "check:"; do
+for target in "lint:" "test:" "build:" "audit:" "root-test:" "verify:" "check:"; do
   if ! grep -Fq "$target" "$MAKEFILE"; then
     printf '%s\n' "Makefile must expose the $target gate." >&2
     exit 1
@@ -396,7 +398,14 @@ for target in "lint:" "test:" "build:" "audit:" "verify:" "check:"; do
 done
 
 for make_contract in \
-  'override REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))' \
+  'ifneq ($(origin MAKEFILE_LIST),file)' \
+  '$(error MAKEFILE_LIST must not be overridden)' \
+  'override REPO_ROOT := $(shell path=' \
+  '/usr/bin/dirname' \
+  '/bin/pwd -P' \
+  'override NPM := npm' \
+  'verify: root-test' \
+  'cd "$(REPO_ROOT)" && node scripts/test-makefile-root.js' \
   'cd "$(REPO_ROOT)" && $(NPM) run lint' \
   'cd "$(REPO_ROOT)" && $(NPM) test' \
   'cd "$(REPO_ROOT)" && $(NPM) run build' \
@@ -407,6 +416,33 @@ for make_contract in \
     printf '%s\n' "Makefile must remain caller-directory independent: $make_contract" >&2
     exit 1
   fi
+done
+
+for root_test_contract in \
+  'const TARGETS = [' \
+  'command REPO_ROOT override' \
+  'environment REPO_ROOT override' \
+  'command NPM override' \
+  'environment NPM override' \
+  'command MAKEFILE_LIST override' \
+  'environment MAKEFILE_LIST override' \
+  '35 target/override cases' \
+  '2 MAKEFILE_LIST rejection cases'; do
+  if ! grep -Fq "$root_test_contract" "$ROOT_DIR/scripts/test-makefile-root.js"; then
+    printf '%s\n' "Makefile root test must preserve: $root_test_contract" >&2
+    exit 1
+  fi
+done
+
+for safe_root_evidence in \
+  'status: completed' \
+  'absolute Makefile path' \
+  '35 target/override cases' \
+  '2 MAKEFILE_LIST rejection cases' \
+  'Node 20' \
+  'Node 24' \
+  'git diff --check'; do
+  require_text "docs/plans/2026-06-21-safe-make-root.md" "$safe_root_evidence"
 done
 
 for package_script in \
