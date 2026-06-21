@@ -1,5 +1,14 @@
 # Changes
 
+## 2026-06-21
+
+- Made every Make quality gate derive and export a canonical root from the
+  checked-in Makefile, reject file-list ambiguity, and ignore caller-controlled
+  root, executable, and shell authority.
+- Added dependency-free regression coverage for all seven public Make targets
+  from external checkout paths containing spaces, quotes, brackets,
+  apostrophes, and backticks.
+
 ## 2026-06-18
 
 - Restricted configurable model lookups to explicit mapping entries so model
