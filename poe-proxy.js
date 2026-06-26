@@ -596,9 +596,10 @@ export function createServer({
       let accumulatedContent = "";
       let accumulatedReasoning = "";
       let usage = null;
-      let textBlockStarted = false;
+      let textBlockIndex = null;
       let encounteredToolCall = false;
-      const toolCallIndexes = new Set();
+      let nextContentBlockIndex = 0;
+      const pendingToolCalls = new Map();
       const lineDecoder = createSseLineDecoder();
       const reader = poeResponse.body.getReader();
       let done = false;
@@ -621,17 +622,38 @@ export function createServer({
           if (trimmed === "" || !trimmed.startsWith("data:")) continue;
           const dataStr = trimmed.replace(/^data:\s*/, "");
           if (dataStr === "[DONE]") {
-            if (encounteredToolCall) {
-              for (const idx of toolCallIndexes) {
-                sendSSE(reply, "content_block_stop", {
-                  type: "content_block_stop",
-                  index: idx,
-                });
-              }
-            } else if (textBlockStarted) {
+            if (textBlockIndex !== null) {
               sendSSE(reply, "content_block_stop", {
                 type: "content_block_stop",
-                index: 0,
+                index: textBlockIndex,
+              });
+            }
+            for (const toolCall of pendingToolCalls.values()) {
+              const contentBlockIndex = nextContentBlockIndex;
+              nextContentBlockIndex += 1;
+              sendSSE(reply, "content_block_start", {
+                type: "content_block_start",
+                index: contentBlockIndex,
+                content_block: {
+                  type: "tool_use",
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  input: {},
+                },
+              });
+              for (const argumentDelta of toolCall.argumentDeltas) {
+                sendSSE(reply, "content_block_delta", {
+                  type: "content_block_delta",
+                  index: contentBlockIndex,
+                  delta: {
+                    type: "input_json_delta",
+                    partial_json: argumentDelta,
+                  },
+                });
+              }
+              sendSSE(reply, "content_block_stop", {
+                type: "content_block_stop",
+                index: contentBlockIndex,
               });
             }
             sendSSE(reply, "message_delta", {
@@ -673,39 +695,30 @@ export function createServer({
           if (delta && delta.tool_calls) {
             for (const toolCall of delta.tool_calls) {
               encounteredToolCall = true;
-              const idx = toolCall.index;
+              const upstreamIndex = toolCall.index;
               const functionDelta = toolCall.function || {};
-              if (!toolCallIndexes.has(idx)) {
-                toolCallIndexes.add(idx);
-                sendSSE(reply, "content_block_start", {
-                  type: "content_block_start",
-                  index: idx,
-                  content_block: {
-                    type: "tool_use",
-                    id: toolCall.id,
-                    name: functionDelta.name,
-                    input: {},
-                  },
+              if (!pendingToolCalls.has(upstreamIndex)) {
+                pendingToolCalls.set(upstreamIndex, {
+                  id: toolCall.id,
+                  name: functionDelta.name,
+                  argumentDeltas: [],
                 });
               }
+              const pendingToolCall = pendingToolCalls.get(upstreamIndex);
+              if (toolCall.id) pendingToolCall.id = toolCall.id;
+              if (functionDelta.name) pendingToolCall.name = functionDelta.name;
               const argumentDelta = functionDelta.arguments || "";
               if (argumentDelta) {
-                sendSSE(reply, "content_block_delta", {
-                  type: "content_block_delta",
-                  index: idx,
-                  delta: {
-                    type: "input_json_delta",
-                    partial_json: argumentDelta,
-                  },
-                });
+                pendingToolCall.argumentDeltas.push(argumentDelta);
               }
             }
           } else if (delta && delta.content) {
-            if (!textBlockStarted) {
-              textBlockStarted = true;
+            if (textBlockIndex === null) {
+              textBlockIndex = nextContentBlockIndex;
+              nextContentBlockIndex += 1;
               sendSSE(reply, "content_block_start", {
                 type: "content_block_start",
-                index: 0,
+                index: textBlockIndex,
                 content_block: {
                   type: "text",
                   text: "",
@@ -715,18 +728,19 @@ export function createServer({
             accumulatedContent += delta.content;
             sendSSE(reply, "content_block_delta", {
               type: "content_block_delta",
-              index: 0,
+              index: textBlockIndex,
               delta: {
                 type: "text_delta",
                 text: delta.content,
               },
             });
           } else if (delta && delta.reasoning) {
-            if (!textBlockStarted) {
-              textBlockStarted = true;
+            if (textBlockIndex === null) {
+              textBlockIndex = nextContentBlockIndex;
+              nextContentBlockIndex += 1;
               sendSSE(reply, "content_block_start", {
                 type: "content_block_start",
-                index: 0,
+                index: textBlockIndex,
                 content_block: {
                   type: "text",
                   text: "",
@@ -736,7 +750,7 @@ export function createServer({
             accumulatedReasoning += delta.reasoning;
             sendSSE(reply, "content_block_delta", {
               type: "content_block_delta",
-              index: 0,
+              index: textBlockIndex,
               delta: {
                 type: "thinking_delta",
                 thinking: delta.reasoning,

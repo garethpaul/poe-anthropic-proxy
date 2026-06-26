@@ -53,6 +53,8 @@ for path in \
   "docs/plans/2026-06-16-internal-error-redaction.md" \
   "docs/plans/2026-06-17-internal-error-log-redaction.md" \
   "docs/plans/2026-06-21-safe-make-root.md" \
+  "docs/plans/2026-06-26-mixed-stream-block-indexes.md" \
+  "scripts/check-mixed-stream-index-mutation.js" \
   "scripts/check-baseline.sh" \
   "scripts/test-makefile-root.js"; do
   require_file "$path"
@@ -461,13 +463,33 @@ done
 for package_script in \
   '"lint": "node --check poe-proxy.js"' \
   '"test": "node --test"' \
+  '"test:mutation": "node scripts/check-mixed-stream-index-mutation.js"' \
   '"build": "node --check poe-proxy.js"' \
   '"audit": "npm audit --audit-level=moderate"' \
-  '"verify": "npm run lint && npm test && npm run build && npm run audit"'; do
+  '"verify": "npm run lint && npm test && npm run test:mutation && npm run build && npm run audit"'; do
   if ! grep -Fq "$package_script" "$PACKAGE_JSON"; then
     printf '%s\n' "package.json must keep script baseline: $package_script" >&2
     exit 1
   fi
+done
+
+for mixed_stream_contract in \
+  'const pendingToolCalls = new Map();' \
+  'pendingToolCalls.set(upstreamIndex' \
+  'for (const toolCall of pendingToolCalls.values())' \
+  'for (const argumentDelta of toolCall.argumentDeltas)' \
+  'assigns unique Anthropic indexes to mixed text and tool blocks' \
+  'Mixed-stream index mutation rejected.'; do
+  case "$mixed_stream_contract" in
+    assigns*) document="test/poe-proxy.test.js" ;;
+    Mixed-stream*) document="scripts/check-mixed-stream-index-mutation.js" ;;
+    *) document="poe-proxy.js" ;;
+  esac
+  require_text "$document" "$mixed_stream_contract"
+done
+
+for mixed_stream_document in "README.md" "SECURITY.md" "VISION.md" "CHANGES.md"; do
+  require_text "$mixed_stream_document" "content-block index"
 done
 
 for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "POE_RATE_LIMIT_MAX" "POE_RATE_LIMIT_WINDOW_MS" "upstream request timeout" "HTTP 429" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux" "GitHub Actions"; do

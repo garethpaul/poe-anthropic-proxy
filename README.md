@@ -86,6 +86,8 @@ Built-in mappings:
   return a stable `504` response.
 - Streaming translation buffers partial SSE lines and UTF-8 bytes across stream
   chunk boundaries so network segmentation cannot drop response content.
+- Mixed text and tool streams close the text block before emitting sequential
+  tool blocks with Anthropic content-block indexes in emission order.
 - Use `npm run lint`, `npm run build`, `make lint`, and `make build` as stable
   local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local
@@ -111,7 +113,8 @@ Detected npm scripts:
 - `npm run lint` - `node --check poe-proxy.js`
 - `npm run start` - `node poe-proxy.js`
 - `npm run test` - `node --test`
-- `npm run verify` - `npm run lint && npm test && npm run build && npm run audit`
+- `npm run test:mutation` - rejects a restored mixed-stream index collision
+- `npm run verify` - `npm run lint && npm test && npm run test:mutation && npm run build && npm run audit`
 - `scripts/check-baseline.sh` - repository baseline guard for package scripts,
   completed plans, and local secret/editor metadata
 
@@ -180,6 +183,8 @@ rejected and must not be treated as compatibility guarantees.
   split multibyte text and a final line without a trailing newline.
 - Streamed tool call argument fragments are forwarded as deltas and preserve
   their original order for Anthropic clients.
+- Mixed streamed text and tool calls use unique Anthropic content-block indexes
+  and complete each block's start/delta/stop series before starting the next.
 - Model mappings apply only to explicit entries; inherited JavaScript object
   properties remain ordinary upstream model names.
 - Malformed Poe tool call arguments are treated as local mapping errors instead
