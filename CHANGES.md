@@ -1,5 +1,17 @@
 # Changes
 
+## 2026-06-26 - Complete empty stream lifecycle
+
+- Priority: correctness / protocol compatibility.
+- Empty successful Poe streams now emit `message_start`, `ping`,
+  `message_delta`, and `message_stop` in order instead of returning only the
+  terminal events.
+- Added a test-first Fastify route regression and durable source,
+  documentation, and implementation-plan contracts.
+- Supported Node 20 passed all 37 tests, the existing mixed-stream mutation,
+  syntax/build checks, and a zero-finding moderate dependency audit; removing
+  the terminal handshake call failed the new lifecycle regression.
+
 ## 2026-06-26 08:13:59 PDT
 
 - Priority: correctness / protocol compatibility.

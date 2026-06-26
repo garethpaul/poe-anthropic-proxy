@@ -54,6 +54,7 @@ for path in \
   "docs/plans/2026-06-17-internal-error-log-redaction.md" \
   "docs/plans/2026-06-21-safe-make-root.md" \
   "docs/plans/2026-06-26-mixed-stream-block-indexes.md" \
+  "docs/plans/2026-06-26-empty-stream-lifecycle.md" \
   "scripts/check-mixed-stream-index-mutation.js" \
   "scripts/check-baseline.sh" \
   "scripts/test-makefile-root.js"; do
@@ -490,6 +491,24 @@ done
 
 for mixed_stream_document in "README.md" "SECURITY.md" "VISION.md" "CHANGES.md"; do
   require_text "$mixed_stream_document" "content-block index"
+done
+
+if [ "$(grep -Fc 'sendSuccessMessage();' "$ROOT_DIR/poe-proxy.js")" -ne 2 ]; then
+  printf '%s\n' "stream handling must send the success handshake for content and empty terminal streams." >&2
+  exit 1
+fi
+require_text "test/poe-proxy.test.js" \
+  "createServer emits a complete lifecycle for an empty successful stream"
+for empty_stream_document in "README.md" "SECURITY.md" "VISION.md" "CHANGES.md"; do
+  require_text "$empty_stream_document" "Empty successful Poe streams"
+done
+for empty_stream_evidence in \
+  "status: completed" \
+  'only `message_delta` and `message_stop`' \
+  "All 37 Node tests passed" \
+  "Supported Node 20" \
+  'Removing the `[DONE]` branch handshake call'; do
+  require_text "docs/plans/2026-06-26-empty-stream-lifecycle.md" "$empty_stream_evidence"
 done
 
 for documented in "POE_API_KEY" "POE_PROXY_API_KEY" "POE_UPSTREAM_TIMEOUT_MS" "POE_RATE_LIMIT_MAX" "POE_RATE_LIMIT_WINDOW_MS" "upstream request timeout" "HTTP 429" "make check" "npm run verify" "scripts/check-baseline.sh" "hosted Linux" "GitHub Actions"; do
