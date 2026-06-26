@@ -71,6 +71,8 @@ network segmentation cannot silently remove translated response content.
 Mixed text and tool streams must not reuse upstream tool-array indexes as
 Anthropic content-block indexes; every started block must have one unique index
 and one matching stop event before the next block starts.
+Empty successful Poe streams must still emit the complete Anthropic lifecycle
+before closing so callers never receive a terminal-only success response.
 
 ## Dependency and Supply Chain Security
 

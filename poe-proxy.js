@@ -622,6 +622,7 @@ export function createServer({
           if (trimmed === "" || !trimmed.startsWith("data:")) continue;
           const dataStr = trimmed.replace(/^data:\s*/, "");
           if (dataStr === "[DONE]") {
+            sendSuccessMessage();
             if (textBlockIndex !== null) {
               sendSSE(reply, "content_block_stop", {
                 type: "content_block_stop",

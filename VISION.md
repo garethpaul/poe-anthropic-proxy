@@ -31,6 +31,7 @@ Priority:
   deterministic fixtures
 - Keep mixed text/tool content-block indexes unique and each block sequential
   and closed
+- Empty successful Poe streams must retain a complete Anthropic event lifecycle
 - Keep malformed upstream response shapes covered by deterministic tests
 - Keep upstream error payloads covered by deterministic route tests
 - Keep the upstream request timeout configurable and covered by route tests

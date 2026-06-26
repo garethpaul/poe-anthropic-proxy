@@ -88,6 +88,8 @@ Built-in mappings:
   chunk boundaries so network segmentation cannot drop response content.
 - Mixed text and tool streams close the text block before emitting sequential
   tool blocks with Anthropic content-block indexes in emission order.
+- Empty successful Poe streams still emit `message_start`, `ping`,
+  `message_delta`, and `message_stop` in Anthropic protocol order.
 - Use `npm run lint`, `npm run build`, `make lint`, and `make build` as stable
   local aliases around the dependency-free syntax gate.
 - Malformed non-streaming upstream responses are rejected with an explicit local

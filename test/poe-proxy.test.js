@@ -808,6 +808,48 @@ test("createServer preserves streamed SSE data split across byte chunks", async 
   }
 });
 
+test("createServer emits a complete lifecycle for an empty successful stream", async () => {
+  const encoded = new TextEncoder().encode("data: [DONE]\n\n");
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoded);
+          controller.close();
+        },
+      }),
+    }),
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: { authorization: "Bearer proxy-key" },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+        stream: true,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(
+      response.body
+        .split("\n")
+        .filter((line) => line.startsWith("event: "))
+        .map((line) => line.slice(7)),
+      ["message_start", "ping", "message_delta", "message_stop"]
+    );
+    assert.match(response.body, /"stop_reason":"end_turn"/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("createServer preserves streamed tool argument delta fragments", async () => {
   const encoded = new TextEncoder().encode(
     [
