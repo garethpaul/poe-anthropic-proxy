@@ -343,7 +343,7 @@ test("repository check wrapper is documented and preserved", () => {
   assert.equal(pkg.scripts.build, "node --check poe-proxy.js");
   assert.equal(
     pkg.scripts.verify,
-    "npm run lint && npm test && npm run build && npm run audit"
+    "npm run lint && npm test && npm run test:mutation && npm run build && npm run audit"
   );
   assert.match(
     makefile,
@@ -852,6 +852,91 @@ test("createServer preserves streamed tool argument delta fragments", async () =
     assert.deepEqual(argumentDeltas, ['{"city"', ':"Paris"}']);
     assert.equal(argumentDeltas.join(""), '{"city":"Paris"}');
     assert.match(response.body, /event: message_stop/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("createServer assigns unique Anthropic indexes to mixed text and tool blocks", async () => {
+  const encoded = new TextEncoder().encode(
+    [
+      'data: {"choices":[{"delta":{"content":"Checking weather."}}]}',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"weather","arguments":"{\\"city\\":\\"Paris\\"}"}}]}}]}',
+      "data: [DONE]",
+    ].join("\n\n")
+  );
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoded);
+          controller.close();
+        },
+      }),
+    }),
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: { authorization: "Bearer proxy-key" },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+        stream: true,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    const events = response.body
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)));
+    const starts = events.filter(
+      (event) => event.type === "content_block_start"
+    );
+    const stops = events.filter(
+      (event) => event.type === "content_block_stop"
+    );
+    const toolDelta = events.find(
+      (event) => event.delta?.type === "input_json_delta"
+    );
+    const contentBlockSequence = events
+      .filter((event) => event.type.startsWith("content_block_"))
+      .map((event) => {
+        if (event.type === "content_block_start") {
+          return `start:${event.index}:${event.content_block.type}`;
+        }
+        if (event.type === "content_block_delta") {
+          return `delta:${event.index}:${event.delta.type}`;
+        }
+        return `stop:${event.index}`;
+      });
+
+    assert.deepEqual(
+      starts.map((event) => [event.index, event.content_block.type]),
+      [
+        [0, "text"],
+        [1, "tool_use"],
+      ]
+    );
+    assert.equal(toolDelta.index, 1);
+    assert.deepEqual(
+      stops.map((event) => event.index),
+      [0, 1]
+    );
+    assert.deepEqual(contentBlockSequence, [
+      "start:0:text",
+      "delta:0:text_delta",
+      "stop:0",
+      "start:1:tool_use",
+      "delta:1:input_json_delta",
+      "stop:1",
+    ]);
   } finally {
     await server.close();
   }

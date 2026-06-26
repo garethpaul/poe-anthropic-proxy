@@ -9,9 +9,10 @@
     "dev": "node --watch poe-proxy.js",
     "lint": "node --check poe-proxy.js",
     "test": "node --test",
+    "test:mutation": "node scripts/check-mixed-stream-index-mutation.js",
     "build": "node --check poe-proxy.js",
     "audit": "npm audit --audit-level=moderate",
-    "verify": "npm run lint && npm test && npm run build && npm run audit"
+    "verify": "npm run lint && npm test && npm run test:mutation && npm run build && npm run audit"
   },
   "dependencies": {
     "@fastify/rate-limit": "11.0.0",

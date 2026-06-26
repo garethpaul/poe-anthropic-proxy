@@ -68,6 +68,9 @@ callers. Unexpected internal exception details must not enter application logs;
 operators receive only a stable failure marker.
 Poe stream chunk boundaries must be buffered before JSON parsing so ordinary
 network segmentation cannot silently remove translated response content.
+Mixed text and tool streams must not reuse upstream tool-array indexes as
+Anthropic content-block indexes; every started block must have one unique index
+and one matching stop event before the next block starts.
 
 ## Dependency and Supply Chain Security
 
