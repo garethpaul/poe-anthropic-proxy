@@ -808,6 +808,56 @@ test("createServer preserves streamed SSE data split across byte chunks", async 
   }
 });
 
+test("createServer completes the stream when a usage chunk carries no choices", async () => {
+  // The OpenAI-compatible streaming convention delivers usage as its own chunk
+  // with an empty choices array. handleMessages already accumulates
+  // parsed.usage, so this shape is expected; dereferencing choices[0] on it
+  // used to throw after the headers were sent, truncating the response to a
+  // 200 with no message_stop.
+  const encoded = new TextEncoder().encode(
+    'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n' +
+      'data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":3}}\n\n' +
+      "data: [DONE]\n\n"
+  );
+  const server = createServer({
+    apiKey: "test-key",
+    proxyApiKey: "proxy-key",
+    logger: false,
+    fetchImpl: async () => ({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoded);
+          controller.close();
+        },
+      }),
+    }),
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/messages",
+      headers: { authorization: "Bearer proxy-key" },
+      payload: {
+        messages: [{ role: "user", content: "Hello" }],
+        stream: true,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /"text_delta","text":"Hello"/);
+    // The stream must terminate properly rather than stopping mid-message.
+    assert.match(response.body, /event: content_block_stop/);
+    assert.match(response.body, /event: message_delta/);
+    assert.match(response.body, /event: message_stop/);
+    // The usage chunk must still reach the message_delta.
+    assert.match(response.body, /"output_tokens":3/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("createServer emits a complete lifecycle for an empty successful stream", async () => {
   const encoded = new TextEncoder().encode("data: [DONE]\n\n");
   const server = createServer({

@@ -692,7 +692,12 @@ export function createServer({
           if (parsed.usage) {
             usage = parsed.usage;
           }
-          const delta = parsed.choices[0].delta;
+          // Usage and other metadata chunks arrive as {"choices":[],"usage":{...}}
+          // under the OpenAI-compatible streaming convention, so choices[0] can
+          // be absent. Dereferencing it unconditionally threw after the headers
+          // were already sent, ending the stream with a 200 and no message_stop.
+          // The delta guards below already tolerate an absent delta.
+          const delta = parsed.choices?.[0]?.delta;
           if (delta && delta.tool_calls) {
             for (const toolCall of delta.tool_calls) {
               encounteredToolCall = true;
