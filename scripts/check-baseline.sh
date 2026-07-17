@@ -384,6 +384,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      # Out-of-band observers: these run the runners DIRECTLY, so a Makefile
+      # that swallows a failing status cannot hide a red suite from CI.
+      - run: npm run verify
+      - run: scripts/check-baseline.sh
       - run: make check
 EOF
 )
@@ -396,6 +400,46 @@ fi
 for target in "lint:" "test:" "build:" "audit:" "root-test:" "verify:" "check:"; do
   if ! grep -Fq "$target" "$MAKEFILE"; then
     printf '%s\n' "Makefile must expose the $target gate." >&2
+    exit 1
+  fi
+done
+
+# Recipe and rule lines must match EXACTLY, whole-line, including the leading
+# tab. An unanchored substring pin cannot see either of the two mutations that
+# silently disarm this gate while every other check keeps passing:
+#   1. Appended text: "$(NPM) run verify" is a substring of
+#      "$(NPM) run verify || true". The command still runs and still prints its
+#      failures, but the exit status the verdict travels on is discarded, so
+#      "make check" reports success over a red test suite.
+#   2. A dropped prerequisite: "check:" is a substring of "check: verify", so
+#      rewriting "check: verify" to "check:" passes the target loop above while
+#      "make check" stops running the executable suite entirely.
+# grep -Fqx anchors both ends, so any appended, prefixed, or removed text fails.
+TAB=$(printf '\t')
+for make_recipe in \
+  'cd "$$REPO_ROOT" && $(NPM) run lint' \
+  'cd "$$REPO_ROOT" && $(NPM) test' \
+  'cd "$$REPO_ROOT" && $(NPM) run build' \
+  'cd "$$REPO_ROOT" && $(NPM) run audit' \
+  'cd "$$REPO_ROOT" && $(NPM) run verify' \
+  'cd "$$REPO_ROOT" && $(NODE) scripts/test-makefile-root.js' \
+  'cd "$$REPO_ROOT" && scripts/check-baseline.sh'; do
+  if ! grep -Fqx "$TAB$make_recipe" "$MAKEFILE"; then
+    printf '%s\n' "Makefile recipe must match exactly, with no appended status-swallowing text: $make_recipe" >&2
+    exit 1
+  fi
+done
+
+for make_rule in \
+  'lint:' \
+  'test:' \
+  'build:' \
+  'audit:' \
+  'root-test:' \
+  'verify: root-test' \
+  'check: verify'; do
+  if ! grep -Fqx "$make_rule" "$MAKEFILE"; then
+    printf '%s\n' "Makefile rule line must match exactly, preserving its prerequisites: $make_rule" >&2
     exit 1
   fi
 done
@@ -442,7 +486,13 @@ for root_test_contract in \
   'environment MAKEFILE_LIST override' \
   '77 executed target/authority cases' \
   '1 MAKEFILES rejection' \
-  '1 multi-Makefile rejection'; do
+  '1 multi-Makefile rejection' \
+  'const FAILURE_INJECTIONS = [' \
+  'exit 1\n";' \
+  'assert.notEqual(' \
+  'the exit-status channel is broken' \
+  '10 failure-injection propagation cases' \
+  'assert.equal(injectionCases, 10, "expected 10 failure-injection propagation cases");'; do
   if ! grep -Fq "$root_test_contract" "$ROOT_DIR/scripts/test-makefile-root.js"; then
     printf '%s\n' "Makefile root test must preserve: $root_test_contract" >&2
     exit 1
