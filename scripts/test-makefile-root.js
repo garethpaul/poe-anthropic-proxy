@@ -140,6 +140,60 @@ try {
   }
   assert.ok(!existsSync(fakeShellLog), "caller-controlled SHELL was executed");
 
+  // Per-command failure injection. The scenarios above prove each quality
+  // command is DISPATCHED from the checkout, but a dispatch log can never prove
+  // the gate still GATES: appending "|| true" to a recipe leaves the command
+  // running and the log byte-identical while silently discarding the exit status
+  // the verdict travels on. Only observing a NONZERO make exit when an
+  // individual command fails proves the failure still propagates. Each case also
+  // reasserts that the failing command actually ran from the checkout, so a
+  // nonzero status cannot be misattributed to a broken Makefile parse.
+  const FAILURE_INJECTIONS = [
+    ["npm", path.join(fakeBin, "npm"), ["audit", "build", "check", "lint", "test", "verify"]],
+    ["node", path.join(fakeBin, "node"), ["check", "root-test", "verify"]],
+    ["check-baseline.sh", path.join(checkout, "scripts", "check-baseline.sh"), ["check"]],
+  ];
+  const failingLogger =
+    "#!/bin/sh\n" +
+    "printf '%s|%s\\n' \"$PWD\" \"$*\" >> \"$POE_PROXY_COMMAND_LOG\"\n" +
+    "exit 1\n";
+
+  let injectionCases = 0;
+  for (const [command, commandPath, targets] of FAILURE_INJECTIONS) {
+    writeExecutable(commandPath, failingLogger);
+    try {
+      for (const target of targets) {
+        rmSync(commandLog, { force: true });
+        const result = runMake(
+          [makefile],
+          target,
+          [],
+          makeEnvironment(fakeBin, commandLog),
+          controlDirectory,
+        );
+        const output = combinedOutput(result);
+        assert.notEqual(
+          result.status,
+          0,
+          `failing ${command} did not fail the ${target} gate; the exit-status channel is broken:\n${output}`,
+        );
+        assert.ok(
+          existsSync(commandLog),
+          `failing ${command} ${target} executed no quality command`,
+        );
+        const commands = readFileSync(commandLog, "utf8").trim().split("\n");
+        assert.ok(
+          commands.every((entry) => entry.startsWith(`${checkout}|`)),
+          `failing ${command} ${target} escaped the checkout:\n${commands.join("\n")}`,
+        );
+        injectionCases += 1;
+      }
+    } finally {
+      writeExecutable(commandPath, logger);
+    }
+  }
+  assert.equal(injectionCases, 10, "expected 10 failure-injection propagation cases");
+
   for (const [scenario, args, environment] of [
     [
       "command MAKEFILE_LIST override",
@@ -203,7 +257,8 @@ try {
 
   console.log(
     "Makefile root tests passed: 77 executed target/authority cases, " +
-      "2 MAKEFILE_LIST rejections, 1 MAKEFILES rejection, and 1 multi-Makefile rejection",
+      "10 failure-injection propagation cases, 2 MAKEFILE_LIST rejections, " +
+      "1 MAKEFILES rejection, and 1 multi-Makefile rejection",
   );
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });

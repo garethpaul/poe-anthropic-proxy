@@ -29,4 +29,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      # Out-of-band observers: these run the runners DIRECTLY, so a Makefile
+      # that swallows a failing status cannot hide a red suite from CI.
+      - run: npm run verify
+      - run: scripts/check-baseline.sh
       - run: make check
